@@ -118,6 +118,19 @@ class Document(QObject):
         self.boundaries_changed.emit()
         return patch
 
+    def add_periodic_pair(self, name, source_patch_id, target_patch_id,
+                          reversed=False, tolerance=1.0e-8, transform=None):
+        pair = self.boundaries.add_periodic_pair(
+            name, source_patch_id, target_patch_id, reversed, tolerance, transform
+        )
+        self.boundaries_changed.emit()
+        return pair
+
+    def remove_periodic_pair(self, pair_id: int):
+        pair = self.boundaries.remove_periodic_pair(pair_id)
+        self.boundaries_changed.emit()
+        return pair
+
     def unassign_boundary_edges(self, patch_id: int, edge_ids):
         patch = self.boundaries.unassign_edges(patch_id, edge_ids)
         self.boundaries_changed.emit()
