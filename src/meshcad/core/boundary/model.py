@@ -5,6 +5,7 @@ from dataclasses import replace
 from typing import Dict, Iterable, Tuple
 
 from meshcad.core.boundary.patch import BoundaryPatch
+from meshcad.core.boundary.periodic import PeriodicPair, PeriodicTransform
 from meshcad.core.boundary.types import BoundaryType
 from meshcad.core.boundary.validation import (
     BoundaryIssueCode,
@@ -20,10 +21,58 @@ class BoundaryModel:
     def __init__(self) -> None:
         self._patches: Dict[int, BoundaryPatch] = {}
         self._next_patch_id = 0
+        self._periodic_pairs: Dict[int, PeriodicPair] = {}
+        self._next_periodic_pair_id = 0
 
     @property
     def next_patch_id(self) -> int:
         return self._next_patch_id
+
+    @property
+    def next_periodic_pair_id(self) -> int:
+        return self._next_periodic_pair_id
+
+    def periodic_pairs(self) -> Tuple[PeriodicPair, ...]:
+        return tuple(self._periodic_pairs[pair_id] for pair_id in sorted(self._periodic_pairs))
+
+    def get_periodic_pair(self, pair_id: int) -> PeriodicPair:
+        try:
+            return self._periodic_pairs[int(pair_id)]
+        except KeyError as exc:
+            raise KeyError("Unknown periodic pair id: {}".format(pair_id)) from exc
+
+    def periodic_pair_for_patch(self, patch_id: int) -> PeriodicPair | None:
+        for pair in self.periodic_pairs():
+            if patch_id in (pair.source_patch_id, pair.target_patch_id):
+                return pair
+        return None
+
+    def add_periodic_pair(
+        self, name: str, source_patch_id: int, target_patch_id: int,
+        reversed: bool = False, tolerance: float = 1.0e-8,
+        transform: PeriodicTransform | None = None,
+    ) -> PeriodicPair:
+        source = self.get_patch(source_patch_id)
+        target = self.get_patch(target_patch_id)
+        if source.boundary_type is not BoundaryType.PERIODIC or target.boundary_type is not BoundaryType.PERIODIC:
+            raise ValueError("Both patches in a periodic pair must have type 'periodic'")
+        if self.periodic_pair_for_patch(source.id) is not None or self.periodic_pair_for_patch(target.id) is not None:
+            raise ValueError("A periodic patch can belong to only one pair")
+        folded = name.strip().casefold()
+        if any(pair.name.casefold() == folded for pair in self.periodic_pairs()):
+            raise ValueError("Periodic pair name already exists: {}".format(name.strip()))
+        pair = PeriodicPair(
+            self._next_periodic_pair_id, name, source.id, target.id,
+            bool(reversed), float(tolerance), transform or PeriodicTransform(),
+        )
+        self._periodic_pairs[pair.id] = pair
+        self._next_periodic_pair_id += 1
+        return pair
+
+    def remove_periodic_pair(self, pair_id: int) -> PeriodicPair:
+        pair = self.get_periodic_pair(pair_id)
+        del self._periodic_pairs[pair.id]
+        return pair
 
     def patches(self) -> Tuple[BoundaryPatch, ...]:
         return tuple(self._patches[patch_id] for patch_id in sorted(self._patches))
@@ -54,6 +103,9 @@ class BoundaryModel:
 
     def remove_patch(self, patch_id: int) -> BoundaryPatch:
         patch = self.get_patch(patch_id)
+        pair = self.periodic_pair_for_patch(patch.id)
+        if pair is not None:
+            self.remove_periodic_pair(pair.id)
         del self._patches[patch.id]
         return patch
 
@@ -68,7 +120,12 @@ class BoundaryModel:
         self, patch_id: int, boundary_type: BoundaryType | str
     ) -> BoundaryPatch:
         patch = self.get_patch(patch_id)
-        updated = replace(patch, boundary_type=BoundaryType(boundary_type))
+        new_type = BoundaryType(boundary_type)
+        if new_type is not BoundaryType.PERIODIC:
+            pair = self.periodic_pair_for_patch(patch.id)
+            if pair is not None:
+                self.remove_periodic_pair(pair.id)
+        updated = replace(patch, boundary_type=new_type)
         self._patches[patch.id] = updated
         return updated
 
@@ -170,7 +227,9 @@ class BoundaryModel:
 
     @classmethod
     def restore(
-        cls, patches: Iterable[BoundaryPatch], next_patch_id: int | None = None
+        cls, patches: Iterable[BoundaryPatch], next_patch_id: int | None = None,
+        periodic_pairs: Iterable[PeriodicPair] = (),
+        next_periodic_pair_id: int | None = None,
     ) -> "BoundaryModel":
         model = cls()
         for patch in patches:
@@ -191,4 +250,18 @@ class BoundaryModel:
             model._next_patch_id = int(next_patch_id)
             if model._next_patch_id < minimum:
                 raise ValueError("next_patch_id is smaller than an existing patch id")
+        for pair in periodic_pairs:
+            source = model.get_patch(pair.source_patch_id)
+            target = model.get_patch(pair.target_patch_id)
+            if source.boundary_type is not BoundaryType.PERIODIC or target.boundary_type is not BoundaryType.PERIODIC:
+                raise ValueError("Both patches in a periodic pair must have type 'periodic'")
+            if pair.id in model._periodic_pairs:
+                raise ValueError("Duplicate periodic pair id: {}".format(pair.id))
+            if model.periodic_pair_for_patch(source.id) or model.periodic_pair_for_patch(target.id):
+                raise ValueError("A periodic patch can belong to only one pair")
+            model._periodic_pairs[pair.id] = pair
+        pair_minimum = max(model._periodic_pairs, default=-1) + 1
+        model._next_periodic_pair_id = pair_minimum if next_periodic_pair_id is None else int(next_periodic_pair_id)
+        if model._next_periodic_pair_id < pair_minimum:
+            raise ValueError("next_periodic_pair_id is smaller than an existing pair id")
         return model

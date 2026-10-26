@@ -227,6 +227,8 @@ def boundary_model_to_dict(model):
     return {
         "patches": [boundary_patch_to_dict(patch) for patch in model.patches()],
         "next_patch_id": model.next_patch_id,
+        "periodic_pairs": [periodic_pair_to_dict(pair) for pair in model.periodic_pairs()],
+        "next_periodic_pair_id": model.next_periodic_pair_id,
     }
 
 
@@ -235,4 +237,34 @@ def boundary_model_from_dict(data):
 
     data = data or {}
     patches = [boundary_patch_from_dict(item) for item in data.get("patches", [])]
-    return BoundaryModel.restore(patches, data.get("next_patch_id"))
+    pairs = [periodic_pair_from_dict(item) for item in data.get("periodic_pairs", [])]
+    return BoundaryModel.restore(
+        patches, data.get("next_patch_id"), pairs, data.get("next_periodic_pair_id")
+    )
+
+
+def periodic_pair_to_dict(pair):
+    return {
+        "id": pair.id,
+        "name": pair.name,
+        "source_patch_id": pair.source_patch_id,
+        "target_patch_id": pair.target_patch_id,
+        "reversed": pair.reversed,
+        "tolerance": pair.tolerance,
+        "transform": {
+            "translation_x": pair.transform.translation_x,
+            "translation_y": pair.transform.translation_y,
+        },
+    }
+
+
+def periodic_pair_from_dict(data):
+    from meshcad.core.boundary import PeriodicPair, PeriodicTransform
+    transform = data.get("transform", {})
+    return PeriodicPair(
+        int(data["id"]), str(data["name"]),
+        int(data["source_patch_id"]), int(data["target_patch_id"]),
+        bool(data.get("reversed", False)), float(data.get("tolerance", 1.0e-8)),
+        PeriodicTransform(float(transform.get("translation_x", 0.0)),
+                          float(transform.get("translation_y", 0.0))),
+    )

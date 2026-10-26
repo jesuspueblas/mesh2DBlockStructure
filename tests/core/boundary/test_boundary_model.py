@@ -104,3 +104,27 @@ def test_patch_is_immutable():
     patch = BoundaryPatch(0, "wall", BoundaryType.WALL)
     with pytest.raises(FrozenInstanceError):
         patch.name = "changed"
+
+
+def test_periodic_pair_requires_two_distinct_periodic_patches():
+    model = BoundaryModel()
+    a = model.add_patch("periodic_a", "periodic")
+    b = model.add_patch("periodic_b", "periodic")
+    pair = model.add_periodic_pair("vertical", a.id, b.id, reversed=True)
+    assert pair.reversed is True
+    assert model.periodic_pair_for_patch(a.id) == pair
+    with pytest.raises(ValueError, match="only one pair"):
+        model.add_periodic_pair("duplicate", a.id, b.id)
+
+
+def test_removing_or_retyping_patch_removes_its_periodic_pair():
+    model = BoundaryModel()
+    a = model.add_patch("a", "periodic")
+    b = model.add_patch("b", "periodic")
+    model.add_periodic_pair("pair", a.id, b.id)
+    model.set_patch_type(a.id, "wall")
+    assert model.periodic_pairs() == ()
+    model.set_patch_type(a.id, "periodic")
+    model.add_periodic_pair("pair2", a.id, b.id)
+    model.remove_patch(b.id)
+    assert model.periodic_pairs() == ()
