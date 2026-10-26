@@ -4,12 +4,14 @@ from __future__ import annotations
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
     QAbstractItemView,
+    QCheckBox,
     QComboBox,
     QDialog,
     QDialogButtonBox,
     QFormLayout,
     QHBoxLayout,
     QLabel,
+    QDoubleSpinBox,
     QLineEdit,
     QListWidget,
     QListWidgetItem,
@@ -20,11 +22,12 @@ from PyQt5.QtWidgets import (
     QDockWidget,
 )
 
-from meshcad.core.boundary import BoundaryType
+from meshcad.core.boundary import BoundaryType, PeriodicTransform
 from meshcad.core.topology.usage import find_edge_uses
 from meshcad.gui.document import Document
 
 PATCH_ID_ROLE = Qt.UserRole
+PAIR_ID_ROLE = Qt.UserRole
 
 
 class BoundaryPatchDialog(QDialog):
@@ -46,6 +49,59 @@ class BoundaryPatchDialog(QDialog):
 
     def values(self):
         return self.name_edit.text(), BoundaryType(self.type_combo.currentData())
+
+
+class PeriodicPairDialog(QDialog):
+    """Collect an explicit translational periodic-pair definition."""
+
+    def __init__(self, periodic_patches, parent=None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Periodic pair")
+        layout = QFormLayout(self)
+        self.name_edit = QLineEdit()
+        self.source_combo = QComboBox()
+        self.target_combo = QComboBox()
+        for patch in periodic_patches:
+            self.source_combo.addItem(patch.name, patch.id)
+            self.target_combo.addItem(patch.name, patch.id)
+        if self.target_combo.count() > 1:
+            self.target_combo.setCurrentIndex(1)
+        self.reversed_check = QCheckBox("Reverse target node order")
+        self.dx_spin = self._coordinate_spin()
+        self.dy_spin = self._coordinate_spin()
+        self.tolerance_spin = QDoubleSpinBox()
+        self.tolerance_spin.setDecimals(12)
+        self.tolerance_spin.setRange(1.0e-12, 1.0e6)
+        self.tolerance_spin.setValue(1.0e-8)
+        self.tolerance_spin.setSingleStep(1.0e-8)
+        layout.addRow("Name", self.name_edit)
+        layout.addRow("Source patch", self.source_combo)
+        layout.addRow("Target patch", self.target_combo)
+        layout.addRow("Orientation", self.reversed_check)
+        layout.addRow("Translation X", self.dx_spin)
+        layout.addRow("Translation Y", self.dy_spin)
+        layout.addRow("Tolerance", self.tolerance_spin)
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addRow(buttons)
+
+    @staticmethod
+    def _coordinate_spin():
+        spin = QDoubleSpinBox()
+        spin.setDecimals(12)
+        spin.setRange(-1.0e12, 1.0e12)
+        return spin
+
+    def values(self):
+        return {
+            "name": self.name_edit.text(),
+            "source_patch_id": int(self.source_combo.currentData()),
+            "target_patch_id": int(self.target_combo.currentData()),
+            "reversed": self.reversed_check.isChecked(),
+            "tolerance": self.tolerance_spin.value(),
+            "transform": PeriodicTransform(self.dx_spin.value(), self.dy_spin.value()),
+        }
 
 
 class BoundariesPanel(QDockWidget):
@@ -80,6 +136,17 @@ class BoundariesPanel(QDockWidget):
         self.status = QLabel("")
         self.status.setWordWrap(True)
         layout.addWidget(self.status)
+
+        layout.addWidget(QLabel("Periodic pairs"))
+        self.pairs_list = QListWidget()
+        self.pairs_list.setSelectionMode(QAbstractItemView.SingleSelection)
+        layout.addWidget(self.pairs_list)
+        pair_buttons = QHBoxLayout()
+        self.new_pair_button = QPushButton("New pair")
+        self.delete_pair_button = QPushButton("Delete pair")
+        pair_buttons.addWidget(self.new_pair_button)
+        pair_buttons.addWidget(self.delete_pair_button)
+        layout.addLayout(pair_buttons)
         self.setWidget(container)
 
         self.new_button.clicked.connect(self._on_new)
@@ -87,6 +154,9 @@ class BoundariesPanel(QDockWidget):
         self.delete_button.clicked.connect(self._on_delete)
         self.assign_button.clicked.connect(self._on_assign)
         self.remove_button.clicked.connect(self._on_remove)
+        self.new_pair_button.clicked.connect(self._on_new_pair)
+        self.delete_pair_button.clicked.connect(self._on_delete_pair)
+        self.pairs_list.itemSelectionChanged.connect(self._update_buttons)
         self.document.boundaries_changed.connect(self.refresh)
         self.document.blocks_changed.connect(self.refresh_status)
         self.refresh()
@@ -111,8 +181,35 @@ class BoundariesPanel(QDockWidget):
             self.list_widget.addItem(item)
             if patch.id == selected:
                 self.list_widget.setCurrentItem(item)
+        self._refresh_periodic_pairs()
         self._update_buttons()
         self.refresh_status()
+
+    def _refresh_periodic_pairs(self) -> None:
+        selected_pair_id = None
+        current_item = self.pairs_list.currentItem()
+        if current_item is not None:
+            selected_pair_id = current_item.data(PAIR_ID_ROLE)
+
+        self.pairs_list.clear()
+        for pair in self.document.boundaries.periodic_pairs():
+            source = self.document.boundaries.get_patch(pair.source_patch_id)
+            target = self.document.boundaries.get_patch(pair.target_patch_id)
+            orientation = "reversed" if pair.reversed else "direct"
+            item = QListWidgetItem(
+                "{}: {} -> {} [{}], d=({:.6g}, {:.6g})".format(
+                    pair.name,
+                    source.name,
+                    target.name,
+                    orientation,
+                    pair.transform.translation_x,
+                    pair.transform.translation_y,
+                )
+            )
+            item.setData(PAIR_ID_ROLE, pair.id)
+            self.pairs_list.addItem(item)
+            if pair.id == selected_pair_id:
+                self.pairs_list.setCurrentItem(item)
 
     def refresh_status(self) -> None:
         usage = find_edge_uses(self.document.blocks)
@@ -149,6 +246,15 @@ class BoundariesPanel(QDockWidget):
         self.delete_button.setEnabled(enabled)
         self.assign_button.setEnabled(enabled)
         self.remove_button.setEnabled(enabled)
+        available_periodic_patches = sum(
+            patch.boundary_type is BoundaryType.PERIODIC
+            and self.document.boundaries.periodic_pair_for_patch(patch.id) is None
+            for patch in self.document.boundaries.patches()
+        )
+        self.new_pair_button.setEnabled(available_periodic_patches >= 2)
+        self.delete_pair_button.setEnabled(
+            self.pairs_list.currentItem() is not None
+        )
 
     def _on_new(self) -> None:
         dialog = BoundaryPatchDialog(self)
@@ -209,6 +315,28 @@ class BoundariesPanel(QDockWidget):
             return
         self.document.unassign_boundary_edges(patch_id, edge_ids)
         self.status.setText("{} edge(s) removed from the patch.".format(len(edge_ids)))
+
+    def _on_new_pair(self) -> None:
+        available = [
+            patch for patch in self.document.boundaries.patches()
+            if patch.boundary_type is BoundaryType.PERIODIC
+            and self.document.boundaries.periodic_pair_for_patch(patch.id) is None
+        ]
+        if len(available) < 2:
+            self.status.setText("At least two unpaired periodic patches are required.")
+            return
+        dialog = PeriodicPairDialog(available, self)
+        if dialog.exec_() != QDialog.Accepted:
+            return
+        try:
+            self.document.add_periodic_pair(**dialog.values())
+        except (KeyError, ValueError) as exc:
+            QMessageBox.warning(self, "Periodic pair", str(exc))
+
+    def _on_delete_pair(self) -> None:
+        item = self.pairs_list.currentItem()
+        if item is not None:
+            self.document.remove_periodic_pair(int(item.data(PAIR_ID_ROLE)))
 
     def _select_patch(self, patch_id: int) -> None:
         for row in range(self.list_widget.count()):

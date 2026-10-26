@@ -49,3 +49,39 @@ def test_delete_patch(qtbot):
     panel._select_patch(patch.id)
     panel._on_delete()
     assert doc.boundaries.patches() == ()
+
+
+def test_periodic_pair_list_and_buttons(qtbot):
+    doc = Document()
+    a = doc.add_boundary_patch("bottom", BoundaryType.PERIODIC)
+    b = doc.add_boundary_patch("top", BoundaryType.PERIODIC)
+    panel = BoundariesPanel(doc, FakeEdgesPanel())
+    qtbot.addWidget(panel)
+    assert panel.new_pair_button.isEnabled()
+    pair = doc.add_periodic_pair("vertical", a.id, b.id)
+    assert panel.pairs_list.count() == 1
+    assert "vertical: bottom -> top [direct]" in panel.pairs_list.item(0).text()
+    assert panel.new_pair_button.isEnabled() is False
+    panel.pairs_list.setCurrentRow(0)
+    assert panel.delete_pair_button.isEnabled()
+    panel._on_delete_pair()
+    assert doc.boundaries.periodic_pairs() == ()
+
+
+def test_periodic_pair_dialog_values(qtbot):
+    from meshcad.core.boundary import BoundaryModel, PeriodicTransform
+    from meshcad.gui.boundaries_panel import PeriodicPairDialog
+    model = BoundaryModel()
+    a = model.add_patch("a", BoundaryType.PERIODIC)
+    b = model.add_patch("b", BoundaryType.PERIODIC)
+    dialog = PeriodicPairDialog([a, b])
+    qtbot.addWidget(dialog)
+    dialog.name_edit.setText("pair")
+    dialog.reversed_check.setChecked(True)
+    dialog.dx_spin.setValue(2.5)
+    dialog.dy_spin.setValue(-1.25)
+    values = dialog.values()
+    assert values["source_patch_id"] == a.id
+    assert values["target_patch_id"] == b.id
+    assert values["reversed"] is True
+    assert values["transform"] == PeriodicTransform(2.5, -1.25)
