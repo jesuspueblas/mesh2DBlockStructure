@@ -21,6 +21,7 @@ class Document(QObject):
     topology_changed = pyqtSignal()
     mesh_changed = pyqtSignal()
     blocks_changed = pyqtSignal()
+    boundaries_changed = pyqtSignal()
     mesh_generated = pyqtSignal()
     project_replaced = pyqtSignal()
 
@@ -75,9 +76,11 @@ class Document(QObject):
             else:
                 self.topology.remove_edge(eid)
                 self.mesh.clear_spec(eid)
+                self.boundaries.discard_edges([eid])
                 success += 1
 
         if success > 0:
+            self.boundaries_changed.emit()
             self.notify_change()
         return success, fail
 
@@ -86,6 +89,39 @@ class Document(QObject):
             for side in block.sides:
                 side.node_count = self.mesh.side_node_count(side)
         self.blocks_changed.emit()
+
+
+    # ---------------------------- boundaries ---------------------------- #
+
+    def add_boundary_patch(self, name: str, boundary_type):
+        patch = self.boundaries.add_patch(name, boundary_type)
+        self.boundaries_changed.emit()
+        return patch
+
+    def remove_boundary_patch(self, patch_id: int):
+        patch = self.boundaries.remove_patch(patch_id)
+        self.boundaries_changed.emit()
+        return patch
+
+    def rename_boundary_patch(self, patch_id: int, name: str):
+        patch = self.boundaries.rename_patch(patch_id, name)
+        self.boundaries_changed.emit()
+        return patch
+
+    def set_boundary_patch_type(self, patch_id: int, boundary_type):
+        patch = self.boundaries.set_patch_type(patch_id, boundary_type)
+        self.boundaries_changed.emit()
+        return patch
+
+    def assign_boundary_edges(self, patch_id: int, edge_ids):
+        patch = self.boundaries.assign_edges(patch_id, edge_ids)
+        self.boundaries_changed.emit()
+        return patch
+
+    def unassign_boundary_edges(self, patch_id: int, edge_ids):
+        patch = self.boundaries.unassign_edges(patch_id, edge_ids)
+        self.boundaries_changed.emit()
+        return patch
 
     # ------------------------------- mesh ------------------------------- #
 
@@ -114,6 +150,7 @@ class Document(QObject):
         # Asegurarnos de que la edge original mantiene su distribucion
         self.mesh.set_spec(spec)
         self.mesh_changed.emit()
+        self.boundaries_changed.emit()
         self.recompute_blocks()
         if self.block_meshes:
             self.generate_mesh()
@@ -124,6 +161,7 @@ class Document(QObject):
             self._propagate_nodes(spec.edge_id, spec.n_nodes, visited)
             self.mesh.set_spec(spec)
         self.mesh_changed.emit()
+        self.boundaries_changed.emit()
         self.recompute_blocks()
         if self.block_meshes:
             self.generate_mesh()
@@ -193,5 +231,6 @@ class Document(QObject):
         self.block_meshes = []
         self.topology_changed.emit()
         self.mesh_changed.emit()
+        self.boundaries_changed.emit()
         self.recompute_blocks()
         self.project_replaced.emit()

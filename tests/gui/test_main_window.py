@@ -48,3 +48,10 @@ def test_main_window_save_and_reload(qtbot, tmp_path):
     loaded = Document.from_dict(data)
     w.document.load_from(loaded)
     assert len(w.document.topology.edges()) == 1
+
+
+def test_main_window_has_boundary_conditions_panel(qtbot):
+    w = MainWindow()
+    qtbot.addWidget(w)
+    assert w.boundaries_panel.windowTitle() == "Boundary Conditions"
+    assert w.boundaries_panel.document is w.document

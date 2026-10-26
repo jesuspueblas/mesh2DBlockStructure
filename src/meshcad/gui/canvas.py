@@ -5,7 +5,7 @@ import math
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal
 from PyQt5.QtGui import QBrush, QColor, QPainter, QPainterPath, QPen
 from PyQt5.QtWidgets import (
-    QGraphicsEllipseItem, QGraphicsPathItem, QGraphicsScene, QGraphicsView, 
+    QGraphicsEllipseItem, QGraphicsPathItem, QGraphicsScene, QGraphicsView,
     QDialog, QVBoxLayout, QFormLayout, QDoubleSpinBox, QDialogButtonBox
 )
 from meshcad.core.geometry.point import Point2D
@@ -20,7 +20,7 @@ SNAP_TOLERANCE = 8.0
 class CadCanvas(QGraphicsView):
     mouse_moved = pyqtSignal(float, float)
     edge_clicked = pyqtSignal(int)
-    
+
     def __init__(self, document: Document, parent=None) -> None:
         super().__init__(parent)
         self.document = document
@@ -28,7 +28,7 @@ class CadCanvas(QGraphicsView):
         self.setRenderHint(QPainter.Antialiasing, True)
         self.setMouseTracking(True)
         self.setBackgroundBrush(QBrush(QColor(250, 250, 252)))
-        
+
         self.scale(1, -1)
         self.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
 
@@ -36,20 +36,23 @@ class CadCanvas(QGraphicsView):
         self._drag_target = None
         self._is_panning = False
         self._last_mouse_pos = None
-        
+
         self._preview_item = None
         self._highlight_item = None
         self._mesh_item = None
-        
+        self._boundary_items = []
+
         self.show_grid = True
         self.grid_spacing = 10.0
-        
+
         self._vertex_items = {}
         self._grip_items = []
         self._geometry_items = []
 
         self.document.topology_changed.connect(self._redraw_all)
         self.document.mesh_generated.connect(self._on_mesh_generated)
+        self.document.boundaries_changed.connect(self.refresh_boundary_overlay)
+        self.document.blocks_changed.connect(self.refresh_boundary_overlay)
 
     def _model_bounding_rect(self):
         """Calcula los limites del modelo completo y de la mesh visible."""
@@ -177,7 +180,7 @@ class CadCanvas(QGraphicsView):
             path.moveTo(pts[0].x, pts[0].y)
             for p in pts[1:]:
                 path.lineTo(p.x, p.y)
-                
+
         item = QGraphicsPathItem(path)
         pen = QPen(QColor(240, 140, 20))
         pen.setWidthF(3.0)
@@ -191,6 +194,54 @@ class CadCanvas(QGraphicsView):
         if self._highlight_item is not None:
             self.scene().removeItem(self._highlight_item)
             self._highlight_item = None
+
+
+    def clear_boundary_overlay(self) -> None:
+        for item in self._boundary_items:
+            self.scene().removeItem(item)
+        self._boundary_items = []
+
+    def refresh_boundary_overlay(self) -> None:
+        """Draw boundary classification without changing CAD item styling."""
+        from meshcad.core.boundary import BoundaryType
+        from meshcad.core.topology.usage import find_edge_uses
+
+        self.clear_boundary_overlay()
+        usage = find_edge_uses(self.document.blocks)
+        colors = {
+            BoundaryType.WALL: QColor(75, 75, 80),
+            BoundaryType.INLET: QColor(30, 120, 220),
+            BoundaryType.OUTLET: QColor(220, 60, 55),
+            BoundaryType.PERIODIC: QColor(145, 70, 190),
+        }
+        for edge_id, uses in usage.items():
+            if len(uses) == 1:
+                patch = self.document.boundaries.patch_for_edge(edge_id)
+                color = QColor(240, 145, 25) if patch is None else colors[patch.boundary_type]
+                width = 4.0
+                style = Qt.SolidLine
+            elif len(uses) == 2:
+                color = QColor(70, 165, 105)
+                width = 2.5
+                style = Qt.DashLine
+            else:
+                color = QColor(220, 30, 150)
+                width = 4.0
+                style = Qt.DashDotLine
+            try:
+                geometry = self.document.topology.get_edge(edge_id).geometry
+            except (KeyError, ValueError):
+                continue
+            item = GeometryItem(geometry)
+            item.setFlag(QGraphicsPathItem.ItemIsSelectable, False)
+            pen = QPen(color)
+            pen.setWidthF(width)
+            pen.setCosmetic(True)
+            pen.setStyle(style)
+            item.setPen(pen)
+            item.setZValue(6.0)
+            self.scene().addItem(item)
+            self._boundary_items.append(item)
 
     def flash_vertex(self, vertex_id: int) -> None:
         item = self._vertex_items.get(vertex_id)
@@ -251,7 +302,7 @@ class CadCanvas(QGraphicsView):
             self.setCursor(Qt.ClosedHandCursor)
             event.accept()
             return
-            
+
         if self.tool is not None:
             self.tool.mouse_press(event)
             event.accept()
@@ -387,7 +438,7 @@ class CadCanvas(QGraphicsView):
             self.setCursor(Qt.ArrowCursor)
             event.accept()
             return
-            
+
         if self._drag_target:
             self._drag_target = None
             event.accept()
@@ -440,6 +491,8 @@ class CadCanvas(QGraphicsView):
             item.edge_id = edge.id
             self.scene().addItem(item)
             self._geometry_items.append(item)
+
+        self.refresh_boundary_overlay()
 
         pen_v = QPen(QColor(200, 40, 40))
         brush_v = QBrush(QColor(255, 220, 220))

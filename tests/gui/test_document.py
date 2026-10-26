@@ -120,3 +120,12 @@ def test_document_load_from_replaces_boundaries(qtbot):
     target.load_from(source)
 
     assert target.boundaries is source.boundaries
+
+
+def test_boundary_mutations_emit_signal(qtbot):
+    doc = Document()
+    with qtbot.waitSignal(doc.boundaries_changed, timeout=1000):
+        patch = doc.add_boundary_patch("wall", "wall")
+    with qtbot.waitSignal(doc.boundaries_changed, timeout=1000):
+        doc.assign_boundary_edges(patch.id, [1, 2])
+    assert doc.boundaries.get_patch(patch.id).edge_ids == (1, 2)

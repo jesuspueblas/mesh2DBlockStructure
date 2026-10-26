@@ -7,13 +7,14 @@ from PyQt5.QtCore import Qt, QTimer, QSize
 from PyQt5.QtGui import QColor, QIcon, QPainter, QPen, QPixmap
 from PyQt5.QtWidgets import (
     QAction, QApplication, QDoubleSpinBox, QFileDialog, QLabel,
-    QMainWindow, QMessageBox, QStatusBar, QToolBar, QDialog, 
+    QMainWindow, QMessageBox, QStatusBar, QToolBar, QDialog,
     QVBoxLayout, QFormLayout, QDialogButtonBox, QCheckBox, QSpinBox, QStyle
 )
 
 from meshcad.core.geometry.point import Point2D
 from meshcad.core.mesh.smoothing import SmoothingOptions
 from meshcad.gui.blocks_panel import BlocksPanel
+from meshcad.gui.boundaries_panel import BoundariesPanel
 from meshcad.gui.canvas import CadCanvas
 from meshcad.gui.document import Document
 from meshcad.gui.edges_panel import EdgesPanel
@@ -45,20 +46,24 @@ class MainWindow(QMainWindow):
         self.blocks_panel = BlocksPanel(self.document, self)
         self.addDockWidget(Qt.RightDockWidgetArea, self.blocks_panel)
 
+        self.boundaries_panel = BoundariesPanel(self.document, self.edges_panel, self)
+        self.addDockWidget(Qt.RightDockWidgetArea, self.boundaries_panel)
+        self.tabifyDockWidget(self.blocks_panel, self.boundaries_panel)
+
         self.document.topology_changed.connect(self.edges_panel.refresh)
         self.document.project_replaced.connect(self._on_project_replaced)
         self.canvas.edge_clicked.connect(self._on_edge_clicked)
 
         status = QStatusBar()
         self.setStatusBar(status)
-        
+
         self.status_label = QLabel("Ready")
         status.addWidget(self.status_label)
-        
+
         self.coords_label = QLabel("X: 0.00, Y: 0.00")
         self.coords_label.setStyleSheet("padding-right: 10px;")
         status.addPermanentWidget(self.coords_label)
-        
+
         self.canvas.mouse_moved.connect(self._on_mouse_moved)
 
         self._mesh_update_timer = QTimer(self)
@@ -119,7 +124,7 @@ class MainWindow(QMainWindow):
         self.action_spline = QAction("Spline", self)
         self.action_spline.triggered.connect(lambda: self.canvas.set_tool(SplineTool(self.canvas)))
         toolbar.addAction(self.action_spline)
-        
+
         self.action_insert_point = QAction("Insert Point", self)
         self.action_insert_point.triggered.connect(self._on_insert_point)
         toolbar.addAction(self.action_insert_point)
@@ -321,7 +326,7 @@ class MainWindow(QMainWindow):
         buttons.accepted.connect(dialog.accept)
         buttons.rejected.connect(dialog.reject)
         layout.addWidget(buttons)
-        
+
         if dialog.exec_() == QDialog.Accepted:
             self.document.topology.add_vertex(Point2D(spin_x.value(), spin_y.value()))
             self.document.notify_change()
