@@ -197,3 +197,42 @@ def block_from_dict(data: Dict[str, Any]) -> Block:
             "Block {} does not have four sides in the file".format(data.get("id"))
         )
     return Block(int(data["id"]), sides)  # type: ignore[arg-type]
+
+
+# ----------------------------- boundaries ----------------------------- #
+
+
+def boundary_patch_to_dict(patch):
+    """Serialize a BoundaryPatch without introducing Qt dependencies."""
+    return {
+        "id": patch.id,
+        "name": patch.name,
+        "type": patch.boundary_type.value,
+        "edge_ids": list(patch.edge_ids),
+    }
+
+
+def boundary_patch_from_dict(data):
+    from meshcad.core.boundary import BoundaryPatch, BoundaryType
+
+    return BoundaryPatch(
+        id=int(data["id"]),
+        name=str(data["name"]),
+        boundary_type=BoundaryType(data["type"]),
+        edge_ids=tuple(int(edge_id) for edge_id in data.get("edge_ids", [])),
+    )
+
+
+def boundary_model_to_dict(model):
+    return {
+        "patches": [boundary_patch_to_dict(patch) for patch in model.patches()],
+        "next_patch_id": model.next_patch_id,
+    }
+
+
+def boundary_model_from_dict(data):
+    from meshcad.core.boundary import BoundaryModel
+
+    data = data or {}
+    patches = [boundary_patch_from_dict(item) for item in data.get("patches", [])]
+    return BoundaryModel.restore(patches, data.get("next_patch_id"))

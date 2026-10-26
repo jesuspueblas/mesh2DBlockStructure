@@ -6,6 +6,10 @@ vive en la capa de GUI.
 
 from meshcad.io.json_io import (
     block_from_dict,
+    boundary_model_from_dict,
+    boundary_model_to_dict,
+    boundary_patch_from_dict,
+    boundary_patch_to_dict,
     block_side_from_dict,
     block_side_to_dict,
     block_to_dict,
@@ -34,6 +38,10 @@ __all__ = [
     "block_side_from_dict",
     "block_to_dict",
     "block_from_dict",
+    "boundary_patch_to_dict",
+    "boundary_patch_from_dict",
+    "boundary_model_to_dict",
+    "boundary_model_from_dict",
     "save_project",
     "load_project",
     "export_mesh_vtk",

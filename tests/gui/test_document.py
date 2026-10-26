@@ -87,3 +87,36 @@ def test_generate_mesh_reports_mismatch(qtbot):
     assert meshes == []
     assert len(errors) == 1
     assert "Bloque 0" in errors[0]
+
+
+def test_document_boundary_model_round_trip_and_version_2(qtbot):
+    doc = Document()
+    patch = doc.boundaries.add_patch("inlet", "inlet")
+    doc.boundaries.assign_edges(patch.id, [10, 11])
+
+    data = doc.to_dict()
+    restored = Document.from_dict(data)
+
+    assert data["version"] == 2
+    assert restored.boundaries.patches() == doc.boundaries.patches()
+
+
+def test_document_loads_version_1_without_boundaries(qtbot):
+    doc = Document()
+    data = doc.to_dict()
+    data["version"] = 1
+    data.pop("boundaries")
+
+    restored = Document.from_dict(data)
+
+    assert restored.boundaries.patches() == ()
+
+
+def test_document_load_from_replaces_boundaries(qtbot):
+    target = Document()
+    source = Document()
+    source.boundaries.add_patch("wall", "wall")
+
+    target.load_from(source)
+
+    assert target.boundaries is source.boundaries

@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Tuple
 from PyQt5.QtCore import QObject, pyqtSignal
 from PyQt5.QtWidgets import QUndoStack
 
+from meshcad.core.boundary import BoundaryModel
 from meshcad.core.mesh.generator import BlockMesh, mesh_block
 from meshcad.core.mesh.smoothing import SmoothingOptions
 from meshcad.core.mesh.model import EdgeMeshSpec, MeshModel, UniformDistribution
@@ -13,7 +14,7 @@ from meshcad.core.topology.block import Block
 from meshcad.core.topology.topology import Topology
 
 FORMAT = "meshcad-project"
-FORMAT_VERSION = 1
+FORMAT_VERSION = 2
 
 
 class Document(QObject):
@@ -26,6 +27,7 @@ class Document(QObject):
     def __init__(self) -> None:
         super().__init__()
         self.topology = Topology()
+        self.boundaries = BoundaryModel()
         self.mesh = MeshModel()
         self.blocks: List[Block] = []
         self.block_meshes: List[BlockMesh] = []
@@ -67,14 +69,14 @@ class Document(QObject):
                         break
                 if in_block:
                     break
-            
+
             if in_block:
                 fail += 1
             else:
                 self.topology.remove_edge(eid)
                 self.mesh.clear_spec(eid)
                 success += 1
-                
+
         if success > 0:
             self.notify_change()
         return success, fail
@@ -140,11 +142,17 @@ class Document(QObject):
         return self.block_meshes, errors
 
     def to_dict(self) -> Dict[str, Any]:
-        from meshcad.io.json_io import block_to_dict, edge_spec_to_dict, topology_to_dict
+        from meshcad.io.json_io import (
+            block_to_dict,
+            boundary_model_to_dict,
+            edge_spec_to_dict,
+            topology_to_dict,
+        )
         return {
             "format": FORMAT,
             "version": FORMAT_VERSION,
             "topology": topology_to_dict(self.topology),
+            "boundaries": boundary_model_to_dict(self.boundaries),
             "edge_specs": [edge_spec_to_dict(s) for s in self.mesh.edge_specs.values()],
             "blocks": [block_to_dict(b) for b in self.blocks],
             "next_block_id": self._next_block_id,
@@ -153,11 +161,20 @@ class Document(QObject):
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Document":
-        from meshcad.io.json_io import block_from_dict, edge_spec_from_dict, topology_from_dict
+        from meshcad.io.json_io import (
+            block_from_dict,
+            boundary_model_from_dict,
+            edge_spec_from_dict,
+            topology_from_dict,
+        )
         if data.get("format") != FORMAT:
             raise ValueError("Unknown format")
+        version = int(data.get("version", 1))
+        if version not in (1, FORMAT_VERSION):
+            raise ValueError("Unsupported project version: {}".format(version))
         doc = cls()
         doc.topology = topology_from_dict(data["topology"])
+        doc.boundaries = boundary_model_from_dict(data.get("boundaries", {}))
         for sd in data.get("edge_specs", []):
             doc.mesh.set_spec(edge_spec_from_dict(sd))
         doc.blocks = [block_from_dict(bd) for bd in data.get("blocks", [])]
@@ -168,6 +185,7 @@ class Document(QObject):
 
     def load_from(self, other: "Document") -> None:
         self.topology = other.topology
+        self.boundaries = other.boundaries
         self.mesh = other.mesh
         self.blocks = other.blocks
         self._next_block_id = other._next_block_id
