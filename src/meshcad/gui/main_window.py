@@ -11,6 +11,7 @@ from PyQt5.QtWidgets import (
     QVBoxLayout, QFormLayout, QDialogButtonBox, QCheckBox, QSpinBox, QStyle
 )
 
+from meshcad.core.cfd import build_cfd_mesh
 from meshcad.core.geometry.point import Point2D
 from meshcad.core.mesh.smoothing import SmoothingOptions
 from meshcad.gui.blocks_panel import BlocksPanel
@@ -22,6 +23,7 @@ from meshcad.gui.loops_panel import LoopsPanel
 from meshcad.gui.tools.arc_tool import ArcTool
 from meshcad.gui.tools.line_tool import LineTool
 from meshcad.gui.tools.spline_tool import SplineTool
+from meshcad.io.cfd_mesh_io import write_cfd_mesh_json
 from meshcad.io.project_io import load_project, save_project
 
 
@@ -100,6 +102,9 @@ class MainWindow(QMainWindow):
         self.action_export_vtk = QAction("Export Mesh (VTK)...", self)
         self.action_export_vtk.triggered.connect(self._on_export_vtk)
         file_menu.addAction(self.action_export_vtk)
+        self.action_export_cfd_json = QAction("Export CFD Mesh (JSON)...", self)
+        self.action_export_cfd_json.triggered.connect(self._on_export_cfd_json)
+        file_menu.addAction(self.action_export_cfd_json)
         file_menu.addSeparator()
         self.action_quit = QAction("Exit", self)
         self.action_quit.triggered.connect(self.close)
@@ -396,6 +401,44 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Export Error", str(e))
             return
         self.status_label.setText("Mesh exported to: {}".format(path))
+
+    def _on_export_cfd_json(self) -> None:
+        if not self.document.blocks:
+            QMessageBox.information(
+                self, "No CFD Mesh", "Define at least one block before exporting."
+            )
+            return
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Export CFD Mesh",
+            "mesh.cfd.json",
+            "MeshCAD CFD Mesh (*.json);;All Files (*)",
+        )
+        if not path:
+            return
+        output = Path(path)
+        if output.suffix.lower() != ".json":
+            output = Path(str(output) + ".json")
+        try:
+            block_meshes, errors = self.document.generate_mesh()
+            if errors:
+                raise ValueError("Mesh generation failed:\n" + "\n".join(errors))
+            if len(block_meshes) != len(self.document.blocks):
+                raise ValueError("Not all blocks produced a mesh")
+            cfd_mesh = build_cfd_mesh(
+                block_meshes,
+                self.document.blocks,
+                self.document.topology,
+                self.document.mesh,
+                self.document.boundaries,
+            )
+            write_cfd_mesh_json(
+                output, cfd_mesh, self.document.boundaries, pretty=False
+            )
+        except Exception as error:
+            QMessageBox.critical(self, "CFD Export Error", str(error))
+            return
+        self.status_label.setText("CFD mesh exported to: {}".format(output))
 
     def _update_title(self) -> None:
         if self.current_path is None: self.setWindowTitle("MeshCAD - untitled")
