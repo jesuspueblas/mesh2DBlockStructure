@@ -15,7 +15,7 @@ from meshcad.core.cfd import build_cfd_mesh
 from meshcad.core.geometry.point import Point2D
 from meshcad.core.mesh.smoothing import SmoothingOptions
 from meshcad.gui.blocks_panel import BlocksPanel
-from meshcad.gui.boundaries_panel import BoundariesPanel
+from meshcad.gui.patches_panel import BoundariesPanel
 from meshcad.gui.canvas import CadCanvas
 from meshcad.gui.document import Document
 from meshcad.gui.edges_panel import EdgesPanel
@@ -48,9 +48,9 @@ class MainWindow(QMainWindow):
         self.blocks_panel = BlocksPanel(self.document, self)
         self.addDockWidget(Qt.RightDockWidgetArea, self.blocks_panel)
 
-        self.boundaries_panel = BoundariesPanel(self.document, self.edges_panel, self)
-        self.addDockWidget(Qt.RightDockWidgetArea, self.boundaries_panel)
-        self.tabifyDockWidget(self.blocks_panel, self.boundaries_panel)
+        self.patches_panel = BoundariesPanel(self.document, self.edges_panel, self)
+        self.addDockWidget(Qt.RightDockWidgetArea, self.patches_panel)
+        self.tabifyDockWidget(self.blocks_panel, self.patches_panel)
 
         self.document.topology_changed.connect(self.edges_panel.refresh)
         self.document.project_replaced.connect(self._on_project_replaced)
@@ -102,7 +102,7 @@ class MainWindow(QMainWindow):
         self.action_export_vtk = QAction("Export Mesh (VTK)...", self)
         self.action_export_vtk.triggered.connect(self._on_export_vtk)
         file_menu.addAction(self.action_export_vtk)
-        self.action_export_cfd_json = QAction("Export CFD Mesh (JSON)...", self)
+        self.action_export_cfd_json = QAction("Export Mesh (JSON)...", self)
         self.action_export_cfd_json.triggered.connect(self._on_export_cfd_json)
         file_menu.addAction(self.action_export_cfd_json)
         file_menu.addSeparator()
@@ -410,7 +410,7 @@ class MainWindow(QMainWindow):
             return
         path, _ = QFileDialog.getSaveFileName(
             self,
-            "Export CFD Mesh",
+            "Export Mesh",
             "mesh.cfd.json",
             "MeshCAD CFD Mesh (*.json);;All Files (*)",
         )
@@ -430,15 +430,15 @@ class MainWindow(QMainWindow):
                 self.document.blocks,
                 self.document.topology,
                 self.document.mesh,
-                self.document.boundaries,
+                self.document.patches,
             )
             write_cfd_mesh_json(
-                output, cfd_mesh, self.document.boundaries, pretty=False
+                output, cfd_mesh, self.document.patches, pretty=False
             )
         except Exception as error:
             QMessageBox.critical(self, "CFD Export Error", str(error))
             return
-        self.status_label.setText("CFD mesh exported to: {}".format(output))
+        self.status_label.setText("Mesh exported to: {}".format(output))
 
     def _update_title(self) -> None:
         if self.current_path is None: self.setWindowTitle("MeshCAD - untitled")

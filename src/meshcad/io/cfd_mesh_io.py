@@ -6,10 +6,10 @@ import math
 from pathlib import Path
 from typing import Any, Dict, List, Sequence
 
-from meshcad.core.boundary import BoundaryModel
+from meshcad.core.boundary import PatchModel
 from meshcad.core.cfd import CfdMesh
 
-FORMAT_NAME = "meshcad-cfd-mesh"
+FORMAT_NAME = "meshcad-mesh"
 FORMAT_VERSION = 1
 NO_NEIGHBOUR = -1
 
@@ -64,8 +64,8 @@ def _cell_face_connectivity(mesh: CfdMesh) -> tuple[List[List[int]], List[List[i
     return cell_faces, cell_signs
 
 
-def _patches_to_data(mesh: CfdMesh, boundaries: BoundaryModel) -> List[Dict[str, Any]]:
-    known_patches = {patch.id: patch for patch in boundaries.patches()}
+def _patches_to_data(mesh: CfdMesh, patches: PatchModel) -> List[Dict[str, Any]]:
+    known_patches = {patch.id: patch for patch in patches.patches()}
     patch_faces: Dict[int, List[int]] = {patch_id: [] for patch_id in known_patches}
     for face in mesh.faces:
         if face.neighbour is None:
@@ -86,61 +86,13 @@ def _patches_to_data(mesh: CfdMesh, boundaries: BoundaryModel) -> List[Dict[str,
         {
             "id": patch.id,
             "name": patch.name,
-            "type": patch.boundary_type.value,
             "faces": patch_faces[patch.id],
         }
-        for patch in boundaries.patches()
+        for patch in patches.patches()
     ]
 
 
-def _periodic_pairs_to_data(
-    mesh: CfdMesh, boundaries: BoundaryModel
-) -> List[Dict[str, Any]]:
-    pair_models = {pair.id: pair for pair in boundaries.periodic_pairs()}
-    links: Dict[int, List[List[Any]]] = {pair_id: [] for pair_id in pair_models}
-    used_faces = set()
-    for link in mesh.periodic_links:
-        pair = pair_models.get(link.pair_id)
-        if pair is None:
-            raise CfdMeshExportError(
-                f"Periodic link references unknown pair {link.pair_id}"
-            )
-        face_ids = (link.source_face_id, link.target_face_id)
-        if any(face_id < 0 or face_id >= len(mesh.faces) for face_id in face_ids):
-            raise CfdMeshExportError(
-                f"Periodic pair {link.pair_id} references an invalid face"
-            )
-        if link.source_face_id == link.target_face_id:
-            raise CfdMeshExportError(
-                f"Periodic pair {link.pair_id} references the same face twice"
-            )
-        if any(face_id in used_faces for face_id in face_ids):
-            raise CfdMeshExportError("A face belongs to more than one periodic link")
-        source = mesh.faces[link.source_face_id]
-        target = mesh.faces[link.target_face_id]
-        if not source.is_boundary or not target.is_boundary:
-            raise CfdMeshExportError("Periodic links must reference boundary faces")
-        if source.patch_id != pair.source_patch_id or target.patch_id != pair.target_patch_id:
-            raise CfdMeshExportError(
-                f"Periodic link {link.pair_id} does not match its source/target patches"
-            )
-        links[link.pair_id].append(
-            [link.source_face_id, link.target_face_id, bool(link.reversed)]
-        )
-        used_faces.update(face_ids)
-    return [
-        {
-            "id": pair.id,
-            "name": pair.name,
-            "source_patch": pair.source_patch_id,
-            "target_patch": pair.target_patch_id,
-            "face_pairs": links[pair.id],
-        }
-        for pair in boundaries.periodic_pairs()
-    ]
-
-
-def cfd_mesh_to_dict(mesh: CfdMesh, boundaries: BoundaryModel) -> Dict[str, Any]:
+def cfd_mesh_to_dict(mesh: CfdMesh, patches: PatchModel) -> Dict[str, Any]:
     """Return the compact, versioned JSON data model for *mesh*."""
     _ordered_ids(mesh.cells, "Cell")
     _ordered_ids(mesh.faces, "Face")
@@ -171,27 +123,27 @@ def cfd_mesh_to_dict(mesh: CfdMesh, boundaries: BoundaryModel) -> Dict[str, Any]
         "faces": {
             "nodes": [list(face.node_ids) for face in mesh.faces],
             "owner": [face.owner for face in mesh.faces],
+            "patch": [-1 if face.patch_id is None else face.patch_id for face in mesh.faces],
             "neighbour": [
                 NO_NEIGHBOUR if face.neighbour is None else face.neighbour
                 for face in mesh.faces
             ],
         },
         "cells": {"faces": cell_faces, "face_signs": cell_signs},
-        "patches": _patches_to_data(mesh, boundaries),
-        "periodic_pairs": _periodic_pairs_to_data(mesh, boundaries),
+        "patches": _patches_to_data(mesh, patches),
     }
 
 
 def write_cfd_mesh_json(
     path: str | Path,
     mesh: CfdMesh,
-    boundaries: BoundaryModel,
+    patches: PatchModel,
     *,
     pretty: bool = False,
 ) -> None:
     """Validate and write a UTF-8 JSON mesh, compact unless *pretty* is true."""
     output = Path(path)
-    data = cfd_mesh_to_dict(mesh, boundaries)
+    data = cfd_mesh_to_dict(mesh, patches)
     with output.open("w", encoding="utf-8", newline="\n") as stream:
         if pretty:
             json.dump(data, stream, ensure_ascii=False, indent=2, allow_nan=False)

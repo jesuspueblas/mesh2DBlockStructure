@@ -51,7 +51,7 @@ class CadCanvas(QGraphicsView):
 
         self.document.topology_changed.connect(self._redraw_all)
         self.document.mesh_generated.connect(self._on_mesh_generated)
-        self.document.boundaries_changed.connect(self.refresh_boundary_overlay)
+        self.document.patches_changed.connect(self.refresh_boundary_overlay)
         self.document.blocks_changed.connect(self.refresh_boundary_overlay)
 
     def _model_bounding_rect(self):
@@ -203,21 +203,14 @@ class CadCanvas(QGraphicsView):
 
     def refresh_boundary_overlay(self) -> None:
         """Draw boundary classification without changing CAD item styling."""
-        from meshcad.core.boundary import BoundaryType
         from meshcad.core.topology.usage import find_edge_uses
 
         self.clear_boundary_overlay()
         usage = find_edge_uses(self.document.blocks)
-        colors = {
-            BoundaryType.WALL: QColor(75, 75, 80),
-            BoundaryType.INLET: QColor(30, 120, 220),
-            BoundaryType.OUTLET: QColor(220, 60, 55),
-            BoundaryType.PERIODIC: QColor(145, 70, 190),
-        }
         for edge_id, uses in usage.items():
             if len(uses) == 1:
-                patch = self.document.boundaries.patch_for_edge(edge_id)
-                color = QColor(240, 145, 25) if patch is None else colors[patch.boundary_type]
+                patch = self.document.patches.patch_for_edge(edge_id)
+                color = QColor(240, 145, 25) if patch is None else QColor.fromHsv((patch.id * 67) % 360, 150, 210)
                 width = 4.0
                 style = Qt.SolidLine
             elif len(uses) == 2:

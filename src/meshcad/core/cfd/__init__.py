@@ -4,11 +4,10 @@ from meshcad.core.cfd.connectivity import (
     CfdFace,
     CfdMesh,
     ConnectivityError,
-    PeriodicFaceLink,
     build_cfd_mesh,
 )
 
 __all__ = [
     "CfdCell", "CfdFace", "CfdMesh", "ConnectivityError",
-    "PeriodicFaceLink", "build_cfd_mesh",
+"build_cfd_mesh",
 ]

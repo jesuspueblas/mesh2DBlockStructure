@@ -53,8 +53,8 @@ def test_main_window_save_and_reload(qtbot, tmp_path):
 def test_main_window_has_boundary_conditions_panel(qtbot):
     w = MainWindow()
     qtbot.addWidget(w)
-    assert w.boundaries_panel.windowTitle() == "Boundary Conditions"
-    assert w.boundaries_panel.document is w.document
+    assert w.patches_panel.windowTitle() == "Boundary Conditions"
+    assert w.patches_panel.document is w.document
 
 
 def test_main_window_has_cfd_json_export_action(qtbot):

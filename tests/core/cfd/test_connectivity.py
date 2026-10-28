@@ -1,4 +1,4 @@
-from meshcad.core.boundary import BoundaryModel
+from meshcad.core.boundary import PatchModel
 from meshcad.core.cfd import build_cfd_mesh
 from meshcad.core.geometry.line import Line
 from meshcad.core.geometry.point import Point2D
@@ -23,8 +23,8 @@ def _single_square(n=3):
     model = MeshModel()
     for edge in edges:
         model.set_spec(EdgeMeshSpec(edge.id, n, UniformDistribution()))
-    boundaries = BoundaryModel()
-    wall = boundaries.add_patch("wall", "wall")
+    boundaries = PatchModel()
+    wall = boundaries.add_patch("wall")
     boundaries.assign_edges(wall.id, [edge.id for edge in edges])
     return topology, [block], model, boundaries
 
@@ -70,8 +70,8 @@ def test_two_blocks_merge_interface_nodes_and_faces():
     model = MeshModel()
     for edge in topology.edges():
         model.set_spec(EdgeMeshSpec(edge.id, 3, UniformDistribution()))
-    boundaries = BoundaryModel()
-    wall = boundaries.add_patch("wall", "wall")
+    boundaries = PatchModel()
+    wall = boundaries.add_patch("wall")
     boundaries.assign_edges(wall.id, [e0.id, e2.id, e3.id, e4.id, e5.id, e6.id])
     meshes = [mesh_block(block, topology, model) for block in blocks]
     cfd = build_cfd_mesh(meshes, blocks, topology, model, boundaries)

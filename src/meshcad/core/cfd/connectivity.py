@@ -5,7 +5,7 @@ import math
 from dataclasses import dataclass
 from typing import Dict, Iterable, List, Mapping, Sequence, Tuple
 
-from meshcad.core.boundary import BoundaryModel
+from meshcad.core.boundary import PatchModel
 from meshcad.core.geometry.point import Point2D
 from meshcad.core.mesh.generator import BlockMesh
 from meshcad.core.mesh.model import MeshModel
@@ -38,19 +38,10 @@ class CfdFace:
 
 
 @dataclass(frozen=True)
-class PeriodicFaceLink:
-    pair_id: int
-    source_face_id: int
-    target_face_id: int
-    reversed: bool
-
-
-@dataclass(frozen=True)
 class CfdMesh:
     nodes: Tuple[Point2D, ...]
     cells: Tuple[CfdCell, ...]
     faces: Tuple[CfdFace, ...]
-    periodic_links: Tuple[PeriodicFaceLink, ...] = ()
 
     @property
     def internal_faces(self) -> Tuple[CfdFace, ...]:
@@ -139,52 +130,9 @@ def _boundary_segments(
     return result
 
 
-def _pair_periodic_faces(
-    faces: Sequence[CfdFace], nodes: Sequence[Point2D], boundaries: BoundaryModel,
-) -> Tuple[PeriodicFaceLink, ...]:
-    by_patch: Dict[int, List[CfdFace]] = {}
-    for face in faces:
-        if face.is_boundary and face.patch_id is not None:
-            by_patch.setdefault(face.patch_id, []).append(face)
-    links: List[PeriodicFaceLink] = []
-    for pair in boundaries.periodic_pairs():
-        source = by_patch.get(pair.source_patch_id, [])
-        target = by_patch.get(pair.target_patch_id, [])
-        if len(source) != len(target):
-            raise ConnectivityError(
-                "Periodic pair '{}' has different face counts".format(pair.name)
-            )
-        unused = {face.id for face in target}
-        target_by_id = {face.id: face for face in target}
-        for source_face in source:
-            a, b = (nodes[node_id] for node_id in source_face.node_ids)
-            source_mid = Point2D((a.x + b.x) * 0.5, (a.y + b.y) * 0.5)
-            expected = pair.transform.apply(source_mid.as_tuple())
-            source_length = a.distance_to(b)
-            candidates = []
-            for target_id in unused:
-                target_face = target_by_id[target_id]
-                c, d = (nodes[node_id] for node_id in target_face.node_ids)
-                midpoint_error = math.hypot(
-                    (c.x + d.x) * 0.5 - expected[0],
-                    (c.y + d.y) * 0.5 - expected[1],
-                )
-                length_error = abs(c.distance_to(d) - source_length)
-                if max(midpoint_error, length_error) <= pair.tolerance:
-                    candidates.append((midpoint_error + length_error, target_face))
-            if not candidates:
-                raise ConnectivityError(
-                    "Periodic face in pair '{}' has no geometric match".format(pair.name)
-                )
-            _, target_face = min(candidates, key=lambda item: (item[0], item[1].id))
-            unused.remove(target_face.id)
-            links.append(PeriodicFaceLink(pair.id, source_face.id, target_face.id, pair.reversed))
-    return tuple(sorted(links, key=lambda link: (link.pair_id, link.source_face_id)))
-
-
 def build_cfd_mesh(
     block_meshes: Iterable[BlockMesh], blocks: Iterable[Block], topology: Topology,
-    mesh_model: MeshModel, boundaries: BoundaryModel, tolerance: float = 1.0e-9,
+    mesh_model: MeshModel, patches: PatchModel, tolerance: float = 1.0e-9,
 ) -> CfdMesh:
     """Build global nodes, quadrilateral cells, owner/neighbour faces and patches."""
     meshes = sorted(block_meshes, key=lambda mesh: mesh.block_id)
@@ -193,7 +141,7 @@ def build_cfd_mesh(
     mesh_ids = {mesh.block_id for mesh in meshes}
     if block_ids != mesh_ids:
         raise ConnectivityError("Generated block meshes do not match the block model")
-    validation = boundaries.validate(block_list)
+    validation = patches.validate(block_list)
     if not validation.is_valid:
         raise ConnectivityError("Boundary model is invalid: {}".format(validation.issues[0].message))
 
@@ -235,7 +183,7 @@ def build_cfd_mesh(
     cad_segments = _boundary_segments(block_list, topology, mesh_model, registry)
     patch_for_edge = {
         edge_id: patch.id
-        for patch in boundaries.patches()
+        for patch in patches.patches()
         for edge_id in patch.edge_ids
     }
     faces: List[CfdFace] = []
@@ -247,5 +195,4 @@ def build_cfd_mesh(
             raise ConnectivityError("An exterior finite-volume face has no boundary patch")
         faces.append(CfdFace(len(faces), (first, second), owner, neighbour, patch_id, cad_edge_id))
 
-    links = _pair_periodic_faces(faces, registry.nodes, boundaries)
-    return CfdMesh(tuple(registry.nodes), tuple(cells), tuple(faces), links)
+    return CfdMesh(tuple(registry.nodes), tuple(cells), tuple(faces))

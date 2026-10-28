@@ -1,267 +1,56 @@
-"""Boundary-condition collection and its invariants."""
-from __future__ import annotations
-
+"""Neutral geometric patch model, independent of CFD conditions."""
 from dataclasses import replace
 from typing import Dict, Iterable, Tuple
-
-from meshcad.core.boundary.patch import BoundaryPatch
-from meshcad.core.boundary.periodic import PeriodicPair, PeriodicTransform
-from meshcad.core.boundary.types import BoundaryType
-from meshcad.core.boundary.validation import (
-    BoundaryIssueCode,
-    BoundaryValidationIssue,
-    BoundaryValidationResult,
-)
+from meshcad.core.boundary.patch import MeshPatch
 from meshcad.core.topology.usage import find_edge_uses
 
-
-class BoundaryModel:
-    """Own named boundary patches and enforce unique edge assignment."""
-
-    def __init__(self) -> None:
-        self._patches: Dict[int, BoundaryPatch] = {}
-        self._next_patch_id = 0
-        self._periodic_pairs: Dict[int, PeriodicPair] = {}
-        self._next_periodic_pair_id = 0
-
+class PatchModel:
+    def __init__(self): self._patches: Dict[int,MeshPatch]={}; self._next_patch_id=0
     @property
-    def next_patch_id(self) -> int:
-        return self._next_patch_id
-
-    @property
-    def next_periodic_pair_id(self) -> int:
-        return self._next_periodic_pair_id
-
-    def periodic_pairs(self) -> Tuple[PeriodicPair, ...]:
-        return tuple(self._periodic_pairs[pair_id] for pair_id in sorted(self._periodic_pairs))
-
-    def get_periodic_pair(self, pair_id: int) -> PeriodicPair:
-        try:
-            return self._periodic_pairs[int(pair_id)]
-        except KeyError as exc:
-            raise KeyError("Unknown periodic pair id: {}".format(pair_id)) from exc
-
-    def periodic_pair_for_patch(self, patch_id: int) -> PeriodicPair | None:
-        for pair in self.periodic_pairs():
-            if patch_id in (pair.source_patch_id, pair.target_patch_id):
-                return pair
-        return None
-
-    def add_periodic_pair(
-        self, name: str, source_patch_id: int, target_patch_id: int,
-        reversed: bool = False, tolerance: float = 1.0e-8,
-        transform: PeriodicTransform | None = None,
-    ) -> PeriodicPair:
-        source = self.get_patch(source_patch_id)
-        target = self.get_patch(target_patch_id)
-        if source.boundary_type is not BoundaryType.PERIODIC or target.boundary_type is not BoundaryType.PERIODIC:
-            raise ValueError("Both patches in a periodic pair must have type 'periodic'")
-        if self.periodic_pair_for_patch(source.id) is not None or self.periodic_pair_for_patch(target.id) is not None:
-            raise ValueError("A periodic patch can belong to only one pair")
-        folded = name.strip().casefold()
-        if any(pair.name.casefold() == folded for pair in self.periodic_pairs()):
-            raise ValueError("Periodic pair name already exists: {}".format(name.strip()))
-        pair = PeriodicPair(
-            self._next_periodic_pair_id, name, source.id, target.id,
-            bool(reversed), float(tolerance), transform or PeriodicTransform(),
-        )
-        self._periodic_pairs[pair.id] = pair
-        self._next_periodic_pair_id += 1
-        return pair
-
-    def remove_periodic_pair(self, pair_id: int) -> PeriodicPair:
-        pair = self.get_periodic_pair(pair_id)
-        del self._periodic_pairs[pair.id]
-        return pair
-
-    def patches(self) -> Tuple[BoundaryPatch, ...]:
-        return tuple(self._patches[patch_id] for patch_id in sorted(self._patches))
-
-    def get_patch(self, patch_id: int) -> BoundaryPatch:
-        try:
-            return self._patches[int(patch_id)]
-        except KeyError as exc:
-            raise KeyError("Unknown boundary patch id: {}".format(patch_id)) from exc
-
-    def patch_for_edge(self, edge_id: int) -> BoundaryPatch | None:
-        edge_id = int(edge_id)
-        for patch in self.patches():
-            if edge_id in patch.edge_ids:
-                return patch
-        return None
-
-    def add_patch(self, name: str, boundary_type: BoundaryType | str) -> BoundaryPatch:
-        normalized_name = self._validate_unique_name(name)
-        patch = BoundaryPatch(
-            id=self._next_patch_id,
-            name=normalized_name,
-            boundary_type=BoundaryType(boundary_type),
-        )
-        self._patches[patch.id] = patch
-        self._next_patch_id += 1
-        return patch
-
-    def remove_patch(self, patch_id: int) -> BoundaryPatch:
-        patch = self.get_patch(patch_id)
-        pair = self.periodic_pair_for_patch(patch.id)
-        if pair is not None:
-            self.remove_periodic_pair(pair.id)
-        del self._patches[patch.id]
-        return patch
-
-    def rename_patch(self, patch_id: int, name: str) -> BoundaryPatch:
-        patch = self.get_patch(patch_id)
-        normalized_name = self._validate_unique_name(name, exclude_id=patch.id)
-        updated = replace(patch, name=normalized_name)
-        self._patches[patch.id] = updated
-        return updated
-
-    def set_patch_type(
-        self, patch_id: int, boundary_type: BoundaryType | str
-    ) -> BoundaryPatch:
-        patch = self.get_patch(patch_id)
-        new_type = BoundaryType(boundary_type)
-        if new_type is not BoundaryType.PERIODIC:
-            pair = self.periodic_pair_for_patch(patch.id)
-            if pair is not None:
-                self.remove_periodic_pair(pair.id)
-        updated = replace(patch, boundary_type=new_type)
-        self._patches[patch.id] = updated
-        return updated
-
-    def assign_edges(self, patch_id: int, edge_ids: Iterable[int]) -> BoundaryPatch:
-        """Assign edges, moving them atomically from any previous patch."""
-
-        patch = self.get_patch(patch_id)
-        assigned = set(int(edge_id) for edge_id in edge_ids)
-        if not assigned:
-            return patch
-
-        for current in self.patches():
-            if current.id == patch.id:
-                continue
-            remaining = tuple(edge_id for edge_id in current.edge_ids if edge_id not in assigned)
-            if remaining != current.edge_ids:
-                self._patches[current.id] = replace(current, edge_ids=remaining)
-
-        updated = replace(patch, edge_ids=tuple(set(patch.edge_ids) | assigned))
-        self._patches[patch.id] = updated
-        return updated
-
-    def unassign_edges(self, patch_id: int, edge_ids: Iterable[int]) -> BoundaryPatch:
-        patch = self.get_patch(patch_id)
-        removed = set(int(edge_id) for edge_id in edge_ids)
-        updated = replace(
-            patch,
-            edge_ids=tuple(edge_id for edge_id in patch.edge_ids if edge_id not in removed),
-        )
-        self._patches[patch.id] = updated
-        return updated
-
-    def discard_edges(self, edge_ids: Iterable[int]) -> None:
-        """Remove deleted CAD edges from every patch without raising errors."""
-
-        removed = set(int(edge_id) for edge_id in edge_ids)
-        for patch in self.patches():
-            remaining = tuple(edge_id for edge_id in patch.edge_ids if edge_id not in removed)
-            if remaining != patch.edge_ids:
-                self._patches[patch.id] = replace(patch, edge_ids=remaining)
-
-    def validate(self, blocks: Iterable[object]) -> BoundaryValidationResult:
-        usage = find_edge_uses(blocks)
-        external = {edge_id for edge_id, uses in usage.items() if len(uses) == 1}
-        internal = {edge_id for edge_id, uses in usage.items() if len(uses) == 2}
-        non_manifold = {edge_id for edge_id, uses in usage.items() if len(uses) > 2}
-        assigned = set()
-        issues = []
-
-        for patch in self.patches():
-            if not patch.edge_ids:
-                issues.append(BoundaryValidationIssue(
-                    BoundaryIssueCode.EMPTY_PATCH,
-                    "Boundary patch '{}' contains no edges".format(patch.name),
-                    patch_id=patch.id,
-                ))
-            for edge_id in patch.edge_ids:
-                assigned.add(edge_id)
-                if edge_id not in usage:
-                    issues.append(BoundaryValidationIssue(
-                        BoundaryIssueCode.UNKNOWN_EDGE,
-                        "Edge {} is not used by any block".format(edge_id),
-                        patch_id=patch.id,
-                        edge_id=edge_id,
-                    ))
-                elif edge_id in internal:
-                    issues.append(BoundaryValidationIssue(
-                        BoundaryIssueCode.INTERNAL_EDGE,
-                        "Edge {} is an internal block interface".format(edge_id),
-                        patch_id=patch.id,
-                        edge_id=edge_id,
-                    ))
-                elif edge_id in non_manifold:
-                    issues.append(BoundaryValidationIssue(
-                        BoundaryIssueCode.NON_MANIFOLD_EDGE,
-                        "Edge {} is used by more than two blocks".format(edge_id),
-                        patch_id=patch.id,
-                        edge_id=edge_id,
-                    ))
-
-        for edge_id in sorted(external - assigned):
-            issues.append(BoundaryValidationIssue(
-                BoundaryIssueCode.UNASSIGNED_EXTERNAL_EDGE,
-                "External edge {} has no boundary patch".format(edge_id),
-                edge_id=edge_id,
-            ))
-
-        return BoundaryValidationResult(tuple(sorted(issues)))
-
-    def _validate_unique_name(self, name: str, exclude_id: int | None = None) -> str:
-        normalized = name.strip()
-        if not normalized:
-            raise ValueError("Boundary patch name must not be empty")
-        folded = normalized.casefold()
-        for patch in self.patches():
-            if patch.id != exclude_id and patch.name.casefold() == folded:
-                raise ValueError("Boundary patch name already exists: {}".format(normalized))
-        return normalized
-
+    def next_patch_id(self): return self._next_patch_id
+    def patches(self)->Tuple[MeshPatch,...]: return tuple(self._patches[i] for i in sorted(self._patches))
+    def get_patch(self,patch_id):
+        try:return self._patches[int(patch_id)]
+        except KeyError as e: raise KeyError(f"Unknown mesh patch id: {patch_id}") from e
+    def patch_for_edge(self,edge_id): return next((p for p in self.patches() if int(edge_id) in p.edge_ids),None)
+    def add_patch(self,name):
+        p=MeshPatch(self._next_patch_id,self._unique_name(name)); self._patches[p.id]=p; self._next_patch_id+=1; return p
+    def remove_patch(self,patch_id): return self._patches.pop(self.get_patch(patch_id).id)
+    def rename_patch(self,patch_id,name):
+        p=self.get_patch(patch_id); p=replace(p,name=self._unique_name(name,p.id)); self._patches[p.id]=p; return p
+    def assign_edges(self,patch_id,edge_ids:Iterable[int]):
+        target=self.get_patch(patch_id); ids=set(map(int,edge_ids))
+        for p in self.patches():
+            if p.id!=target.id:self._patches[p.id]=replace(p,edge_ids=tuple(e for e in p.edge_ids if e not in ids))
+        target=replace(target,edge_ids=tuple(set(target.edge_ids)|ids)); self._patches[target.id]=target; return target
+    def unassign_edges(self,patch_id,edge_ids):
+        p=self.get_patch(patch_id); ids=set(map(int,edge_ids)); p=replace(p,edge_ids=tuple(e for e in p.edge_ids if e not in ids)); self._patches[p.id]=p; return p
+    def discard_edges(self,edge_ids):
+        ids=set(map(int,edge_ids))
+        for p in self.patches(): self._patches[p.id]=replace(p,edge_ids=tuple(e for e in p.edge_ids if e not in ids))
+    def validate(self,blocks):
+        usage=find_edge_uses(blocks); external={e for e,u in usage.items() if len(u)==1}; assigned={e for p in self.patches() for e in p.edge_ids}
+        issues=[]
+        for p in self.patches():
+            for e in p.edge_ids:
+                if e not in external: issues.append(f"Edge {e} in patch '{p.name}' is not exterior")
+        for e in sorted(external-assigned): issues.append(f"External edge {e} has no mesh patch")
+        return PatchValidationResult(tuple(issues))
+    def _unique_name(self,name,exclude=None):
+        name=name.strip()
+        if not name: raise ValueError("Mesh patch name must not be empty")
+        if any(p.id!=exclude and p.name.casefold()==name.casefold() for p in self.patches()): raise ValueError(f"Mesh patch name already exists: {name}")
+        return name
     @classmethod
-    def restore(
-        cls, patches: Iterable[BoundaryPatch], next_patch_id: int | None = None,
-        periodic_pairs: Iterable[PeriodicPair] = (),
-        next_periodic_pair_id: int | None = None,
-    ) -> "BoundaryModel":
-        model = cls()
-        for patch in patches:
-            if patch.id in model._patches:
-                raise ValueError("Duplicate boundary patch id: {}".format(patch.id))
-            model._validate_unique_name(patch.name)
-            for edge_id in patch.edge_ids:
-                owner = model.patch_for_edge(edge_id)
-                if owner is not None:
-                    raise ValueError(
-                        "Edge {} belongs to more than one boundary patch".format(edge_id)
-                    )
-            model._patches[patch.id] = patch
-        minimum = max(model._patches, default=-1) + 1
-        if next_patch_id is None:
-            model._next_patch_id = minimum
-        else:
-            model._next_patch_id = int(next_patch_id)
-            if model._next_patch_id < minimum:
-                raise ValueError("next_patch_id is smaller than an existing patch id")
-        for pair in periodic_pairs:
-            source = model.get_patch(pair.source_patch_id)
-            target = model.get_patch(pair.target_patch_id)
-            if source.boundary_type is not BoundaryType.PERIODIC or target.boundary_type is not BoundaryType.PERIODIC:
-                raise ValueError("Both patches in a periodic pair must have type 'periodic'")
-            if pair.id in model._periodic_pairs:
-                raise ValueError("Duplicate periodic pair id: {}".format(pair.id))
-            if model.periodic_pair_for_patch(source.id) or model.periodic_pair_for_patch(target.id):
-                raise ValueError("A periodic patch can belong to only one pair")
-            model._periodic_pairs[pair.id] = pair
-        pair_minimum = max(model._periodic_pairs, default=-1) + 1
-        model._next_periodic_pair_id = pair_minimum if next_periodic_pair_id is None else int(next_periodic_pair_id)
-        if model._next_periodic_pair_id < pair_minimum:
-            raise ValueError("next_periodic_pair_id is smaller than an existing pair id")
-        return model
+    def restore(cls,patches,next_patch_id=None,*ignored):
+        m=cls()
+        for p in patches:
+            if p.id in m._patches: raise ValueError(f"Duplicate mesh patch id: {p.id}")
+            m._unique_name(p.name); m._patches[p.id]=p
+        minimum=max(m._patches,default=-1)+1; m._next_patch_id=minimum if next_patch_id is None else int(next_patch_id)
+        return m
+
+class PatchValidationResult:
+    def __init__(self,issues=()): self.issues=tuple(issues)
+    @property
+    def is_valid(self): return not self.issues

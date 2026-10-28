@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Tuple
 from PyQt5.QtCore import QObject, pyqtSignal
 from PyQt5.QtWidgets import QUndoStack
 
-from meshcad.core.boundary import BoundaryModel
+from meshcad.core.boundary import PatchModel
 from meshcad.core.mesh.generator import BlockMesh, mesh_block
 from meshcad.core.mesh.smoothing import SmoothingOptions
 from meshcad.core.mesh.model import EdgeMeshSpec, MeshModel, UniformDistribution
@@ -14,21 +14,21 @@ from meshcad.core.topology.block import Block
 from meshcad.core.topology.topology import Topology
 
 FORMAT = "meshcad-project"
-FORMAT_VERSION = 2
+FORMAT_VERSION = 3
 
 
 class Document(QObject):
     topology_changed = pyqtSignal()
     mesh_changed = pyqtSignal()
     blocks_changed = pyqtSignal()
-    boundaries_changed = pyqtSignal()
+    patches_changed = pyqtSignal()
     mesh_generated = pyqtSignal()
     project_replaced = pyqtSignal()
 
     def __init__(self) -> None:
         super().__init__()
         self.topology = Topology()
-        self.boundaries = BoundaryModel()
+        self.patches = PatchModel()
         self.mesh = MeshModel()
         self.blocks: List[Block] = []
         self.block_meshes: List[BlockMesh] = []
@@ -76,11 +76,11 @@ class Document(QObject):
             else:
                 self.topology.remove_edge(eid)
                 self.mesh.clear_spec(eid)
-                self.boundaries.discard_edges([eid])
+                self.patches.discard_edges([eid])
                 success += 1
 
         if success > 0:
-            self.boundaries_changed.emit()
+            self.patches_changed.emit()
             self.notify_change()
         return success, fail
 
@@ -93,47 +93,29 @@ class Document(QObject):
 
     # ---------------------------- boundaries ---------------------------- #
 
-    def add_boundary_patch(self, name: str, boundary_type):
-        patch = self.boundaries.add_patch(name, boundary_type)
-        self.boundaries_changed.emit()
+    def add_mesh_patch(self, name: str):
+        patch = self.patches.add_patch(name)
+        self.patches_changed.emit()
         return patch
 
-    def remove_boundary_patch(self, patch_id: int):
-        patch = self.boundaries.remove_patch(patch_id)
-        self.boundaries_changed.emit()
+    def remove_mesh_patch(self, patch_id: int):
+        patch = self.patches.remove_patch(patch_id)
+        self.patches_changed.emit()
         return patch
 
-    def rename_boundary_patch(self, patch_id: int, name: str):
-        patch = self.boundaries.rename_patch(patch_id, name)
-        self.boundaries_changed.emit()
+    def rename_mesh_patch(self, patch_id: int, name: str):
+        patch = self.patches.rename_patch(patch_id, name)
+        self.patches_changed.emit()
         return patch
 
-    def set_boundary_patch_type(self, patch_id: int, boundary_type):
-        patch = self.boundaries.set_patch_type(patch_id, boundary_type)
-        self.boundaries_changed.emit()
+    def assign_mesh_patch_edges(self, patch_id: int, edge_ids):
+        patch = self.patches.assign_edges(patch_id, edge_ids)
+        self.patches_changed.emit()
         return patch
 
-    def assign_boundary_edges(self, patch_id: int, edge_ids):
-        patch = self.boundaries.assign_edges(patch_id, edge_ids)
-        self.boundaries_changed.emit()
-        return patch
-
-    def add_periodic_pair(self, name, source_patch_id, target_patch_id,
-                          reversed=False, tolerance=1.0e-8, transform=None):
-        pair = self.boundaries.add_periodic_pair(
-            name, source_patch_id, target_patch_id, reversed, tolerance, transform
-        )
-        self.boundaries_changed.emit()
-        return pair
-
-    def remove_periodic_pair(self, pair_id: int):
-        pair = self.boundaries.remove_periodic_pair(pair_id)
-        self.boundaries_changed.emit()
-        return pair
-
-    def unassign_boundary_edges(self, patch_id: int, edge_ids):
-        patch = self.boundaries.unassign_edges(patch_id, edge_ids)
-        self.boundaries_changed.emit()
+    def unassign_mesh_patch_edges(self, patch_id: int, edge_ids):
+        patch = self.patches.unassign_edges(patch_id, edge_ids)
+        self.patches_changed.emit()
         return patch
 
     # ------------------------------- mesh ------------------------------- #
@@ -163,7 +145,7 @@ class Document(QObject):
         # Asegurarnos de que la edge original mantiene su distribucion
         self.mesh.set_spec(spec)
         self.mesh_changed.emit()
-        self.boundaries_changed.emit()
+        self.patches_changed.emit()
         self.recompute_blocks()
         if self.block_meshes:
             self.generate_mesh()
@@ -174,7 +156,7 @@ class Document(QObject):
             self._propagate_nodes(spec.edge_id, spec.n_nodes, visited)
             self.mesh.set_spec(spec)
         self.mesh_changed.emit()
-        self.boundaries_changed.emit()
+        self.patches_changed.emit()
         self.recompute_blocks()
         if self.block_meshes:
             self.generate_mesh()
@@ -195,7 +177,7 @@ class Document(QObject):
     def to_dict(self) -> Dict[str, Any]:
         from meshcad.io.json_io import (
             block_to_dict,
-            boundary_model_to_dict,
+            patch_model_to_dict,
             edge_spec_to_dict,
             topology_to_dict,
         )
@@ -203,7 +185,7 @@ class Document(QObject):
             "format": FORMAT,
             "version": FORMAT_VERSION,
             "topology": topology_to_dict(self.topology),
-            "boundaries": boundary_model_to_dict(self.boundaries),
+            "patches": patch_model_to_dict(self.patches),
             "edge_specs": [edge_spec_to_dict(s) for s in self.mesh.edge_specs.values()],
             "blocks": [block_to_dict(b) for b in self.blocks],
             "next_block_id": self._next_block_id,
@@ -214,18 +196,18 @@ class Document(QObject):
     def from_dict(cls, data: Dict[str, Any]) -> "Document":
         from meshcad.io.json_io import (
             block_from_dict,
-            boundary_model_from_dict,
+            patch_model_from_dict,
             edge_spec_from_dict,
             topology_from_dict,
         )
         if data.get("format") != FORMAT:
             raise ValueError("Unknown format")
         version = int(data.get("version", 1))
-        if version not in (1, FORMAT_VERSION):
+        if version not in (1, 2, FORMAT_VERSION):
             raise ValueError("Unsupported project version: {}".format(version))
         doc = cls()
         doc.topology = topology_from_dict(data["topology"])
-        doc.boundaries = boundary_model_from_dict(data.get("boundaries", {}))
+        doc.patches = patch_model_from_dict(data.get("boundaries", {}))
         for sd in data.get("edge_specs", []):
             doc.mesh.set_spec(edge_spec_from_dict(sd))
         doc.blocks = [block_from_dict(bd) for bd in data.get("blocks", [])]
@@ -236,7 +218,7 @@ class Document(QObject):
 
     def load_from(self, other: "Document") -> None:
         self.topology = other.topology
-        self.boundaries = other.boundaries
+        self.patches = other.patches
         self.mesh = other.mesh
         self.blocks = other.blocks
         self._next_block_id = other._next_block_id
@@ -244,6 +226,6 @@ class Document(QObject):
         self.block_meshes = []
         self.topology_changed.emit()
         self.mesh_changed.emit()
-        self.boundaries_changed.emit()
+        self.patches_changed.emit()
         self.recompute_blocks()
         self.project_replaced.emit()
