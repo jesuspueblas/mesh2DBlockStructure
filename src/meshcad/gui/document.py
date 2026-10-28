@@ -207,7 +207,7 @@ class Document(QObject):
             raise ValueError("Unsupported project version: {}".format(version))
         doc = cls()
         doc.topology = topology_from_dict(data["topology"])
-        doc.patches = patch_model_from_dict(data.get("boundaries", {}))
+        doc.patches = patch_model_from_dict(data.get("patches", data.get("boundaries", {})))
         for sd in data.get("edge_specs", []):
             doc.mesh.set_spec(edge_spec_from_dict(sd))
         doc.blocks = [block_from_dict(bd) for bd in data.get("blocks", [])]

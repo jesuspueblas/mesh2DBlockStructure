@@ -89,7 +89,7 @@ def test_generate_mesh_reports_mismatch(qtbot):
     assert "Bloque 0" in errors[0]
 
 
-def test_document_patch_model_round_trip_and_version_2(qtbot):
+def test_document_patch_model_round_trip_and_version_3(qtbot):
     doc = Document()
     patch = doc.patches.add_patch("inlet")
     doc.patches.assign_edges(patch.id, [10, 11])
@@ -97,22 +97,22 @@ def test_document_patch_model_round_trip_and_version_2(qtbot):
     data = doc.to_dict()
     restored = Document.from_dict(data)
 
-    assert data["version"] == 2
+    assert data["version"] == 3
     assert restored.patches.patches() == doc.patches.patches()
 
 
-def test_document_loads_version_1_without_boundaries(qtbot):
+def test_document_loads_version_1_without_patches(qtbot):
     doc = Document()
     data = doc.to_dict()
     data["version"] = 1
-    data.pop("boundaries")
+    data.pop("patches")
 
     restored = Document.from_dict(data)
 
     assert restored.patches.patches() == ()
 
 
-def test_document_load_from_replaces_boundaries(qtbot):
+def test_document_load_from_replaces_patches(qtbot):
     target = Document()
     source = Document()
     source.patches.add_patch("wall")
@@ -122,10 +122,10 @@ def test_document_load_from_replaces_boundaries(qtbot):
     assert target.patches is source.patches
 
 
-def test_boundary_mutations_emit_signal(qtbot):
+def test_patch_mutations_emit_signal(qtbot):
     doc = Document()
     with qtbot.waitSignal(doc.patches_changed, timeout=1000):
-        patch = doc.add_boundary_patch("wall", "wall")
+        patch = doc.add_mesh_patch("wall")
     with qtbot.waitSignal(doc.patches_changed, timeout=1000):
-        doc.assign_boundary_edges(patch.id, [1, 2])
+        doc.assign_mesh_patch_edges(patch.id, [1, 2])
     assert doc.patches.get_patch(patch.id).edge_ids == (1, 2)

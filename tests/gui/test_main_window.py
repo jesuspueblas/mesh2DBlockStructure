@@ -50,17 +50,17 @@ def test_main_window_save_and_reload(qtbot, tmp_path):
     assert len(w.document.topology.edges()) == 1
 
 
-def test_main_window_has_boundary_conditions_panel(qtbot):
+def test_main_window_has_mesh_patches_panel(qtbot):
     w = MainWindow()
     qtbot.addWidget(w)
-    assert w.patches_panel.windowTitle() == "Boundary Conditions"
+    assert w.patches_panel.windowTitle() == "Mesh Patches"
     assert w.patches_panel.document is w.document
 
 
-def test_main_window_has_cfd_json_export_action(qtbot):
+def test_main_window_has_mesh_json_export_action(qtbot):
     window = MainWindow()
     qtbot.addWidget(window)
-    assert window.action_export_cfd_json.text() == "Export CFD Mesh (JSON)..."
+    assert window.action_export_cfd_json.text() == "Export Mesh (JSON)..."
 
 
 def test_cfd_json_export_cancel_does_not_generate_mesh(qtbot, monkeypatch):
