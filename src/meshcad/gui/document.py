@@ -5,10 +5,10 @@ from __future__ import annotations
 import math
 from collections import deque
 from collections.abc import Sequence
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from PyQt5.QtCore import QObject, pyqtSignal
-from PyQt5.QtWidgets import QUndoStack
+from PyQt5.QtWidgets import QUndoCommand, QUndoStack
 
 from meshcad.core.boundary import PatchModel
 from meshcad.core.geometry.entity import GeometryEntity
@@ -27,9 +27,34 @@ from meshcad.core.topology.block_side import BlockSide
 from meshcad.core.topology.edge import Edge
 from meshcad.core.topology.topology import Topology
 from meshcad.core.topology.usage import external_edge_ids
+from meshcad.core.topology.vertex import Vertex
 
 FORMAT = "meshcad-project"
 FORMAT_VERSION = 3
+
+
+class _DocumentStateCommand(QUndoCommand):
+    def __init__(
+        self,
+        document: "Document",
+        text: str,
+        before: Tuple[Dict[str, Any], bool],
+        after: Tuple[Dict[str, Any], bool],
+    ) -> None:
+        super().__init__(text)
+        self.document = document
+        self.before = before
+        self.after = after
+        self._skip_initial_redo = True
+
+    def undo(self) -> None:
+        self.document._restore_state(self.before)
+
+    def redo(self) -> None:
+        if self._skip_initial_redo:
+            self._skip_initial_redo = False
+            return
+        self.document._restore_state(self.after)
 
 
 class Document(QObject):
@@ -49,7 +74,48 @@ class Document(QObject):
         self.block_meshes: List[BlockMesh] = []
         self._next_block_id = 0
         self.undo_stack = QUndoStack()
+        self.undo_stack.setUndoLimit(50)
         self.mesh_improvement = SmoothingOptions()
+
+    def capture_undo_state(self) -> Tuple[Dict[str, Any], bool]:
+        return self.to_dict(), bool(self.block_meshes)
+
+    def record_undo_state(
+        self,
+        text: str,
+        before: Tuple[Dict[str, Any], bool],
+    ) -> None:
+        after = self.capture_undo_state()
+        if before != after:
+            self.undo_stack.push(
+                _DocumentStateCommand(self, text, before, after)
+            )
+
+    def perform_undoable(self, text: str, operation: Callable[[], Any]) -> Any:
+        before = self.capture_undo_state()
+        result = operation()
+        self.record_undo_state(text, before)
+        return result
+
+    def _restore_state(
+        self, state: Tuple[Dict[str, Any], bool]
+    ) -> None:
+        data, mesh_was_generated = state
+        restored = self.from_dict(data)
+        self.topology = restored.topology
+        self.patches = restored.patches
+        self.mesh = restored.mesh
+        self.blocks = restored.blocks
+        self._next_block_id = restored._next_block_id
+        self.mesh_improvement = restored.mesh_improvement
+        self.block_meshes = []
+        self.topology_changed.emit()
+        self.mesh_changed.emit()
+        self.patches_changed.emit()
+        self.recompute_blocks()
+        if mesh_was_generated:
+            self.generate_mesh()
+        self.project_replaced.emit()
 
     def notify_change(self) -> None:
         self.topology_changed.emit()
@@ -63,10 +129,27 @@ class Document(QObject):
         return bid
 
     def add_block(self, block: Block) -> None:
-        self.blocks.append(block)
-        self.recompute_blocks()
+        def operation() -> None:
+            self.blocks.append(block)
+            self.recompute_blocks()
+
+        self.perform_undoable("Create block", operation)
+
+    def add_vertex(self, point: Point2D) -> Vertex:
+        def operation() -> Vertex:
+            vertex = self.topology.add_vertex(point)
+            self.notify_change()
+            return vertex
+
+        return self.perform_undoable("Insert point", operation)
 
     def add_point_sequence(self, points: Sequence[Point2D]) -> Edge:
+        return self.perform_undoable(
+            "Import point sequence",
+            lambda: self._add_point_sequence(points),
+        )
+
+    def _add_point_sequence(self, points: Sequence[Point2D]) -> Edge:
         """Add an ordered point sequence as one interpolating spline edge."""
         if len(points) < 2:
             raise ValueError("The point sequence must contain at least two points.")
@@ -117,6 +200,12 @@ class Document(QObject):
         return self.split_edge(edge_id, parameter)
 
     def split_edge(self, edge_id: int, parameter: float) -> Tuple[Edge, Edge]:
+        return self.perform_undoable(
+            "Split edge",
+            lambda: self._split_edge(edge_id, parameter),
+        )
+
+    def _split_edge(self, edge_id: int, parameter: float) -> Tuple[Edge, Edge]:
         edge = self.topology.get_edge(edge_id)
         first_geometry, second_geometry = self.topology.split_geometries(
             edge.geometry, parameter
@@ -278,6 +367,11 @@ class Document(QObject):
                     )
 
     def remove_block(self, block_id: int) -> None:
+        self.perform_undoable(
+            "Delete block", lambda: self._remove_block(block_id)
+        )
+
+    def _remove_block(self, block_id: int) -> None:
         self.blocks = [b for b in self.blocks if b.id != block_id]
         self.recompute_blocks()
         if self.block_meshes:
@@ -285,6 +379,12 @@ class Document(QObject):
         self.blocks_changed.emit()
 
     def remove_edges(self, edge_ids: list) -> tuple:
+        requested_ids = list(edge_ids)
+        return self.perform_undoable(
+            "Delete edges", lambda: self._remove_edges(requested_ids)
+        )
+
+    def _remove_edges(self, edge_ids: list) -> tuple:
         success = 0
         fail = 0
         for eid in edge_ids:
@@ -320,21 +420,44 @@ class Document(QObject):
     # ---------------------------- boundaries ---------------------------- #
 
     def add_mesh_patch(self, name: str):
+        return self.perform_undoable(
+            "Create mesh patch", lambda: self._add_mesh_patch(name)
+        )
+
+    def _add_mesh_patch(self, name: str):
         patch = self.patches.add_patch(name)
         self.patches_changed.emit()
         return patch
 
     def remove_mesh_patch(self, patch_id: int):
+        return self.perform_undoable(
+            "Delete mesh patch", lambda: self._remove_mesh_patch(patch_id)
+        )
+
+    def _remove_mesh_patch(self, patch_id: int):
         patch = self.patches.remove_patch(patch_id)
         self.patches_changed.emit()
         return patch
 
     def rename_mesh_patch(self, patch_id: int, name: str):
+        return self.perform_undoable(
+            "Rename mesh patch",
+            lambda: self._rename_mesh_patch(patch_id, name),
+        )
+
+    def _rename_mesh_patch(self, patch_id: int, name: str):
         patch = self.patches.rename_patch(patch_id, name)
         self.patches_changed.emit()
         return patch
 
     def assign_mesh_patch_edges(self, patch_id: int, edge_ids):
+        requested_edge_ids = list(edge_ids)
+        return self.perform_undoable(
+            "Assign edges to mesh patch",
+            lambda: self._assign_mesh_patch_edges(patch_id, requested_edge_ids),
+        )
+
+    def _assign_mesh_patch_edges(self, patch_id: int, edge_ids):
         requested_edge_ids = set(map(int, edge_ids))
         existing_edge_ids = {edge.id for edge in self.topology.edges()}
         unknown_edge_ids = requested_edge_ids - existing_edge_ids
@@ -360,6 +483,13 @@ class Document(QObject):
         return patch
 
     def unassign_mesh_patch_edges(self, patch_id: int, edge_ids):
+        requested_edge_ids = list(edge_ids)
+        return self.perform_undoable(
+            "Remove edges from mesh patch",
+            lambda: self._unassign_mesh_patch_edges(patch_id, requested_edge_ids),
+        )
+
+    def _unassign_mesh_patch_edges(self, patch_id: int, edge_ids):
         patch = self.patches.unassign_edges(patch_id, edge_ids)
         self.patches_changed.emit()
         return patch
@@ -531,7 +661,11 @@ class Document(QObject):
             self.generate_mesh()
 
     def set_edge_specs(self, specs: List[EdgeMeshSpec]) -> None:
-        self._apply_edge_specs(specs)
+        requested_specs = list(specs)
+        self.perform_undoable(
+            "Change edge distributions",
+            lambda: self._apply_edge_specs(requested_specs),
+        )
 
     def generate_mesh(self) -> Tuple[List[BlockMesh], List[str]]:
         self.block_meshes = []
@@ -589,6 +723,7 @@ class Document(QObject):
         return doc
 
     def load_from(self, other: "Document") -> None:
+        self.undo_stack.clear()
         self.topology = other.topology
         self.patches = other.patches
         self.mesh = other.mesh

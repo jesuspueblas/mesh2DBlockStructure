@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 from PyQt5.QtCore import QSize, Qt, QTimer
-from PyQt5.QtGui import QColor, QIcon, QPainter, QPen, QPixmap
+from PyQt5.QtGui import QColor, QIcon, QKeySequence, QPainter, QPen, QPixmap
 from PyQt5.QtWidgets import (
     QAction,
     QActionGroup,
@@ -106,6 +106,14 @@ class MainWindow(QMainWindow):
 
     def _create_menus(self) -> None:
         file_menu = self.menuBar().addMenu("&File")
+        edit_menu = self.menuBar().addMenu("&Edit")
+        self.action_undo = self.document.undo_stack.createUndoAction(self, "&Undo")
+        self.action_undo.setShortcut(QKeySequence.Undo)
+        edit_menu.addAction(self.action_undo)
+        self.action_redo = self.document.undo_stack.createRedoAction(self, "&Redo")
+        self.action_redo.setShortcut(QKeySequence.Redo)
+        edit_menu.addAction(self.action_redo)
+
         self.action_new = QAction("New", self)
         self.action_new.triggered.connect(self._on_new)
         file_menu.addAction(self.action_new)
@@ -389,8 +397,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(buttons)
 
         if dialog.exec_() == QDialog.Accepted:
-            self.document.topology.add_vertex(Point2D(spin_x.value(), spin_y.value()))
-            self.document.notify_change()
+            self.document.add_vertex(Point2D(spin_x.value(), spin_y.value()))
 
     def _on_toggle_grid(self, checked: bool) -> None:
         self.canvas.show_grid = checked
@@ -530,6 +537,7 @@ class MainWindow(QMainWindow):
         else: self.setWindowTitle("MeshCAD - {}".format(self.current_path))
 
     def _on_project_replaced(self) -> None:
+        self._mesh_update_timer.stop()
         self.edges_panel.refresh()
         self._sync_mesh_controls_from_document()
 
@@ -540,17 +548,20 @@ class MainWindow(QMainWindow):
 
     def _apply_live_mesh_options(self) -> None:
         """Update options and regenerate the mesh without an Apply button."""
-        self.document.mesh_improvement = SmoothingOptions(
-            orthogonal=self.orthogonal_check.isChecked(),
-            orthogonal_layers=self.orthogonal_layers_spin.value(),
-            smoothing_iterations=self.smoothing_iterations_spin.value(),
-            relaxation=self.smoothing_relaxation_spin.value(),
-            orthogonal_strength=self.orthogonal_strength_spin.value(),
-        )
-        if self.document.blocks:
-            self._on_generate_mesh()
-        else:
-            self.status_label.setText("Parameters updated; no blocks exist yet.")
+        def apply_options() -> None:
+            self.document.mesh_improvement = SmoothingOptions(
+                orthogonal=self.orthogonal_check.isChecked(),
+                orthogonal_layers=self.orthogonal_layers_spin.value(),
+                smoothing_iterations=self.smoothing_iterations_spin.value(),
+                relaxation=self.smoothing_relaxation_spin.value(),
+                orthogonal_strength=self.orthogonal_strength_spin.value(),
+            )
+            if self.document.blocks:
+                self._on_generate_mesh()
+            else:
+                self.status_label.setText("Parameters updated; no blocks exist yet.")
+
+        self.document.perform_undoable("Change mesh options", apply_options)
 
     def _sync_mesh_controls_from_document(self) -> None:
         """Load current project parameters into the toolbar."""

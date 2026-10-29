@@ -14,6 +14,7 @@ The main window contains:
 
 - **File menu:** New, Open, Import Point Sequence, Save, Save As, Export Mesh
   (VTK), Export Mesh (JSON), and Exit.
+- **Edit menu:** Undo and Redo for document edits.
 - **Toolbar:** Select, Line, Arc, Spline, Split Edge, Insert Point, Generate Mesh, Clear Mesh, Show Grid, Reset Zoom, and live mesh-improvement controls.
 - **Central canvas:** drawing, selection, geometry editing, zoom, pan, and mesh visualization.
 - **Loops panel:** closed-loop detection and block creation.
@@ -26,6 +27,11 @@ Hold the pointer over a toolbar icon or parameter control to display its tooltip
 The active drawing tool (Select, Line, Arc, or Spline) stays highlighted in the
 toolbar. Vertex and spline/arc grip markers keep a constant on-screen size as
 you zoom.
+
+Use **Edit > Undo** (**Ctrl+Z**) and **Edit > Redo** (**Ctrl+Y**) to reverse or
+restore geometry, block, mesh distribution, boundary patch, and mesh option
+changes. A vertex drag or endpoint merge is recorded as one action. Opening or
+creating a project clears the current undo history.
 
 ## Canvas Navigation
 

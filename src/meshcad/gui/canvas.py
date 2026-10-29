@@ -47,6 +47,7 @@ class CadCanvas(QGraphicsView):
         self.tool = None
         self._drag_target = None
         self._drag_start_pos = None
+        self._drag_start_state = None
         self._vertex_drag_moved = False
         self._snap_target_id = None
         self._is_panning = False
@@ -119,12 +120,21 @@ class CadCanvas(QGraphicsView):
         self.tool_changed.emit(tool)
 
     def add_geometry(self, geometry):
-        topo = self.document.topology
-        v_start = topo.find_vertex_at(geometry.start_point()) or topo.add_vertex(geometry.start_point())
-        v_end = topo.find_vertex_at(geometry.end_point()) or topo.add_vertex(geometry.end_point())
-        edge = topo.add_edge(v_start, v_end, geometry)
-        self.document.notify_change()
-        return edge
+        def operation():
+            topo = self.document.topology
+            v_start = (
+                topo.find_vertex_at(geometry.start_point())
+                or topo.add_vertex(geometry.start_point())
+            )
+            v_end = (
+                topo.find_vertex_at(geometry.end_point())
+                or topo.add_vertex(geometry.end_point())
+            )
+            edge = topo.add_edge(v_start, v_end, geometry)
+            self.document.notify_change()
+            return edge
+
+        return self.document.perform_undoable("Draw geometry", operation)
 
     def snap_to_vertex(self, scene_point: Point2D):
         topo = self.document.topology
@@ -366,6 +376,7 @@ class CadCanvas(QGraphicsView):
             if v is not None:
                 self._drag_target = ('vertex', v.id)
                 self._drag_start_pos = p
+                self._drag_start_state = self.document.capture_undo_state()
                 self._vertex_drag_moved = False
                 event.accept()
                 return
@@ -376,6 +387,7 @@ class CadCanvas(QGraphicsView):
                 for i, g in enumerate(edge.geometry.get_grips()):
                     if g.distance_to(p) <= tol:
                         self._drag_target = ('grip', edge.id, i)
+                        self._drag_start_state = self.document.capture_undo_state()
                         event.accept()
                         return
 
@@ -442,8 +454,10 @@ class CadCanvas(QGraphicsView):
             if vertex is not None:
                 new_point = self._edit_point_dialog("Edit Vertex", vertex.point)
                 if new_point is not None:
+                    before = self.document.capture_undo_state()
                     self.document.topology.move_vertex(vertex.id, new_point)
                     self.document.notify_change()
+                    self.document.record_undo_state("Move vertex", before)
                 event.accept()
                 return
 
@@ -452,8 +466,10 @@ class CadCanvas(QGraphicsView):
                 edge_id, grip_index, grip = grip_hit
                 new_point = self._edit_point_dialog("Edit Control Point", grip)
                 if new_point is not None:
+                    before = self.document.capture_undo_state()
                     self.document.topology.move_edge_grip(edge_id, grip_index, new_point)
                     self.document.notify_change()
+                    self.document.record_undo_state("Move control point", before)
                 event.accept()
                 return
 
@@ -518,8 +534,22 @@ class CadCanvas(QGraphicsView):
                     self.document.topology.move_vertex(source_id, point)
                 self.document.notify_change()
                 self._set_snap_target(None)
+                if self._drag_start_state is not None:
+                    command_text = (
+                        "Merge vertices"
+                        if snap_target is not None and self._vertex_drag_moved
+                        else "Move vertex"
+                    )
+                    self.document.record_undo_state(
+                        command_text, self._drag_start_state
+                    )
+            elif self._drag_start_state is not None:
+                self.document.record_undo_state(
+                    "Move control point", self._drag_start_state
+                )
             self._drag_target = None
             self._drag_start_pos = None
+            self._drag_start_state = None
             self._vertex_drag_moved = False
             event.accept()
             return

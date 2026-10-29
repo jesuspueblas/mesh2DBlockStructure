@@ -111,6 +111,19 @@ def test_dragging_vertex_snaps_and_merges_on_release(qtbot):
     assert topology.get_edge(target_edge.id).start_vertex_id == target.id
     assert canvas._snap_target_id is None
     assert canvas._vertex_items[target.id].brush().color() == QColor(255, 220, 220)
+    assert doc.undo_stack.count() == 1
+    assert doc.undo_stack.undoText() == "Merge vertices"
+
+    doc.undo_stack.undo()
+
+    assert doc.topology.has_vertex(source.id)
+    assert doc.topology.get_edge(source_edge.id).start_vertex_id == source.id
+    assert canvas._vertex_items[target.id].brush().color() != QColor(180, 255, 200)
+
+    doc.undo_stack.redo()
+
+    assert not doc.topology.has_vertex(source.id)
+    assert doc.topology.get_edge(source_edge.id).start_vertex_id == target.id
 
 
 def test_drag_snap_target_ignores_connected_vertex_and_distant_targets(qtbot):
@@ -148,3 +161,4 @@ def test_clicking_near_another_vertex_does_not_merge_without_drag(qtbot):
 
     assert doc.topology.has_vertex(source.id)
     assert doc.topology.has_vertex(nearby.id)
+    assert doc.undo_stack.count() == 0
