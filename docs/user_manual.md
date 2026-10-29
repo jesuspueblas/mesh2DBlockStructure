@@ -210,6 +210,10 @@ Keep the PVD file and its `_blocks` folder together because the collection uses 
 Only exterior block edges can be assigned to mesh patches. An edge shared by
 two blocks is an internal interface and cannot belong to a patch.
 
+Selecting a mesh patch highlights its edges in the model. An edge can belong
+to only one patch and cannot be repeated within a patch; conflicting
+assignments are rejected.
+
 The CFD JSON export keeps shared-interface faces as internal faces with an
 owner and neighbour; they are not assigned to boundary patches. VTK export
 writes one structured grid per block, so the shared interface remains part of

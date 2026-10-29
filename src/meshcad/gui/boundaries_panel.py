@@ -9,15 +9,22 @@ class BoundariesPanel(QDockWidget):
         row=QHBoxLayout(); self.new_button=QPushButton("New"); self.edit_button=QPushButton("Rename"); self.delete_button=QPushButton("Delete")
         for b in (self.new_button,self.edit_button,self.delete_button): row.addWidget(b)
         layout.addLayout(row); self.assign_button=QPushButton("Assign selected edges"); self.remove_button=QPushButton("Remove selected edges"); layout.addWidget(self.assign_button); layout.addWidget(self.remove_button); self.status=QLabel(); layout.addWidget(self.status); self.setWidget(root)
+        self.list_widget.currentRowChanged.connect(self._on_selection_changed)
         self.new_button.clicked.connect(self._new); self.edit_button.clicked.connect(self._rename); self.delete_button.clicked.connect(self._delete); self.assign_button.clicked.connect(self._assign); self.remove_button.clicked.connect(self._remove)
         document.patches_changed.connect(self.refresh); self.refresh()
     def selected_patch_id(self):
         item=self.list_widget.currentItem(); return None if item is None else int(item.data(PATCH_ID_ROLE))
     def refresh(self):
-        selected=self.selected_patch_id(); self.list_widget.clear()
+        selected=self.selected_patch_id(); self.list_widget.blockSignals(True); self.list_widget.clear()
         for patch in self.document.patches.patches():
             item=QListWidgetItem(f"{patch.name} ({len(patch.edge_ids)} edges)"); item.setData(PATCH_ID_ROLE,patch.id); self.list_widget.addItem(item)
             if patch.id==selected:self.list_widget.setCurrentItem(item)
+        self.list_widget.blockSignals(False)
+        self._on_selection_changed()
+    def _on_selection_changed(self, row=None):
+        patch_id=self.selected_patch_id()
+        edge_ids=[] if patch_id is None else self.document.patches.get_patch(patch_id).edge_ids
+        if self.edges_panel is not None:self.edges_panel.select_edges(edge_ids)
     def _new(self):
         name,ok=QInputDialog.getText(self,"New mesh patch","Name:")
         if ok and name.strip():self.document.add_mesh_patch(name)

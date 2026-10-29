@@ -19,10 +19,27 @@ class PatchModel:
     def rename_patch(self,patch_id,name):
         p=self.get_patch(patch_id); p=replace(p,name=self._unique_name(name,p.id)); self._patches[p.id]=p; return p
     def assign_edges(self,patch_id,edge_ids:Iterable[int]):
-        target=self.get_patch(patch_id); ids=set(map(int,edge_ids))
-        for p in self.patches():
-            if p.id!=target.id:self._patches[p.id]=replace(p,edge_ids=tuple(e for e in p.edge_ids if e not in ids))
-        target=replace(target,edge_ids=tuple(set(target.edge_ids)|ids)); self._patches[target.id]=target; return target
+        target=self.get_patch(patch_id); requested=tuple(map(int,edge_ids)); ids=set(requested)
+        if len(ids)!=len(requested):
+            raise ValueError("An edge cannot be assigned to a patch more than once")
+        existing=set(target.edge_ids)&ids
+        if existing:
+            raise ValueError(
+                "Edge(s) {} are already assigned to patch '{}'".format(
+                    ", ".join(map(str, sorted(existing))), target.name
+                )
+            )
+        for patch in self.patches():
+            if patch.id == target.id:
+                continue
+            conflicting = set(patch.edge_ids) & ids
+            if conflicting:
+                raise ValueError(
+                    "Edge(s) {} are already assigned to patch '{}'".format(
+                        ", ".join(map(str, sorted(conflicting))), patch.name
+                    )
+                )
+        target=replace(target,edge_ids=target.edge_ids+tuple(sorted(ids))); self._patches[target.id]=target; return target
     def unassign_edges(self,patch_id,edge_ids):
         p=self.get_patch(patch_id); ids=set(map(int,edge_ids)); p=replace(p,edge_ids=tuple(e for e in p.edge_ids if e not in ids)); self._patches[p.id]=p; return p
     def discard_edges(self,edge_ids):
@@ -46,6 +63,16 @@ class PatchModel:
         m=cls()
         for p in patches:
             if p.id in m._patches: raise ValueError(f"Duplicate mesh patch id: {p.id}")
+            assigned_edges = {
+                edge_id for existing in m.patches() for edge_id in existing.edge_ids
+            }
+            duplicate_edges = assigned_edges & set(p.edge_ids)
+            if duplicate_edges:
+                raise ValueError(
+                    "Edge(s) {} are assigned to more than one mesh patch".format(
+                        ", ".join(map(str, sorted(duplicate_edges)))
+                    )
+                )
             m._unique_name(p.name); m._patches[p.id]=p
         minimum=max(m._patches,default=-1)+1; m._next_patch_id=minimum if next_patch_id is None else int(next_patch_id)
         return m

@@ -11,6 +11,7 @@ from meshcad.core.topology.loop import Loop
 from meshcad.core.topology.topology import Topology
 from meshcad.gui.boundaries_panel import BoundariesPanel
 from meshcad.gui.document import Document
+from meshcad.gui.edges_panel import EdgesPanel
 
 
 def build_square_block(doc, n_nodes=4):
@@ -160,6 +161,36 @@ def test_document_accepts_exterior_edge_patch_assignment(qtbot):
     assert doc.patches.get_patch(patch.id).edge_ids == (exterior_edge_id,)
 
 
+def test_selecting_patch_highlights_its_edges_and_clears_previous_selection(qtbot):
+    doc = Document()
+    block = build_square_block(doc)
+    edge_id = block.sides[0].edge_ids()[0]
+    assigned_patch = doc.add_mesh_patch("wall")
+    empty_patch = doc.add_mesh_patch("empty")
+    doc.assign_mesh_patch_edges(assigned_patch.id, [edge_id])
+
+    class Canvas:
+        highlighted_edges = None
+
+        def highlight_edges(self, edge_ids):
+            self.highlighted_edges = edge_ids
+
+    canvas = Canvas()
+    edges_panel = EdgesPanel(doc, canvas)
+    edges_panel.refresh()
+    boundaries_panel = BoundariesPanel(doc, edges_panel)
+    qtbot.addWidget(edges_panel)
+    qtbot.addWidget(boundaries_panel)
+
+    boundaries_panel.list_widget.setCurrentRow(0)
+    assert edges_panel.selected_edge_ids() == [edge_id]
+    assert canvas.highlighted_edges == [edge_id]
+
+    boundaries_panel.list_widget.setCurrentRow(1)
+    assert edges_panel.selected_edge_ids() == []
+    assert canvas.highlighted_edges == []
+
+
 def test_boundaries_panel_reports_invalid_edge_assignment(qtbot, monkeypatch):
     doc = Document()
     patch = doc.add_mesh_patch("wall")
@@ -167,6 +198,9 @@ def test_boundaries_panel_reports_invalid_edge_assignment(qtbot, monkeypatch):
     class SelectedEdges:
         def selected_edge_ids(self):
             return [42]
+
+        def select_edges(self, _edge_ids):
+            pass
 
     panel = BoundariesPanel(doc, SelectedEdges())
     qtbot.addWidget(panel)
