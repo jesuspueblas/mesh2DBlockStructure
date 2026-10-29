@@ -143,7 +143,9 @@ def build_cfd_mesh(
         raise ConnectivityError("Generated block meshes do not match the block model")
     validation = patches.validate(block_list)
     if not validation.is_valid:
-        raise ConnectivityError("Boundary model is invalid: {}".format(validation.issues[0].message))
+        raise ConnectivityError(
+            "Boundary model is invalid: {}".format(validation.issues[0])
+        )
 
     registry = _NodeRegistry(tolerance)
     local_nodes: Dict[int, List[List[int]]] = {}

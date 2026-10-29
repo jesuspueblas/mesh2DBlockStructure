@@ -1,5 +1,7 @@
+import pytest
+
 from meshcad.core.boundary import PatchModel
-from meshcad.core.cfd import build_cfd_mesh
+from meshcad.core.cfd import ConnectivityError, build_cfd_mesh
 from meshcad.core.geometry.line import Line
 from meshcad.core.geometry.point import Point2D
 from meshcad.core.mesh.distribution import UniformDistribution
@@ -8,6 +10,7 @@ from meshcad.core.mesh.model import EdgeMeshSpec, MeshModel
 from meshcad.core.topology.block import Block
 from meshcad.core.topology.loop import Loop
 from meshcad.core.topology.topology import Topology
+from meshcad.io.cfd_mesh_io import cfd_mesh_to_dict
 
 
 def _single_square(n=3):
@@ -79,4 +82,66 @@ def test_two_blocks_merge_interface_nodes_and_faces():
     assert len(cfd.cells) == 8
     assert len(cfd.internal_faces) == 10
     assert len(cfd.boundary_faces) == 12
-    assert sum(1 for face in cfd.internal_faces if all(cfd.nodes[n].x == 1 for n in face.node_ids)) == 2
+    interface_faces = [
+        face for face in cfd.internal_faces
+        if all(cfd.nodes[node_id].x == 1 for node_id in face.node_ids)
+    ]
+    assert len(interface_faces) == 2
+    assert all(face.patch_id is None for face in interface_faces)
+    assert all(face.cad_edge_id is None for face in interface_faces)
+    exported = cfd_mesh_to_dict(cfd, boundaries)
+    assert all(exported["faces"]["patch"][face.id] == -1 for face in interface_faces)
+    assert all(
+        exported["faces"]["neighbour"][face.id] != -1 for face in interface_faces
+    )
+    assert all(
+        face.id not in exported["patches"][0]["faces"] for face in interface_faces
+    )
+
+
+def test_internal_block_interface_cannot_be_assigned_to_patch():
+    topology = Topology()
+    vertices = [
+        topology.add_vertex(Point2D(*point))
+        for point in ((0, 0), (1, 0), (1, 1), (0, 1), (2, 0), (2, 1))
+    ]
+    v0, v1, v2, v3, v4, v5 = vertices
+    edges = [
+        topology.add_edge(v0, v1, Line(v0.point, v1.point)),
+        topology.add_edge(v1, v2, Line(v1.point, v2.point)),
+        topology.add_edge(v2, v3, Line(v2.point, v3.point)),
+        topology.add_edge(v3, v0, Line(v3.point, v0.point)),
+        topology.add_edge(v1, v4, Line(v1.point, v4.point)),
+        topology.add_edge(v4, v5, Line(v4.point, v5.point)),
+        topology.add_edge(v5, v2, Line(v5.point, v2.point)),
+    ]
+    left_loop = Loop()
+    for edge in edges[:4]:
+        left_loop.add_edge(edge.id)
+    right_loop = Loop()
+    for edge in edges[4:]:
+        right_loop.add_edge(edge.id)
+    right_loop.add_edge(edges[1].id, reversed=True)
+    blocks = [
+        Block(
+            0,
+            left_loop.split_at_corners(topology, [v.id for v in (v0, v1, v2, v3)]),
+        ),
+        Block(
+            1,
+            right_loop.split_at_corners(topology, [v.id for v in (v1, v4, v5, v2)]),
+        ),
+    ]
+    model = MeshModel()
+    for edge in edges:
+        model.set_spec(EdgeMeshSpec(edge.id, 3, UniformDistribution()))
+    patches = PatchModel()
+    wall = patches.add_patch("wall")
+    patches.assign_edges(
+        wall.id, [edge.id for edge in edges if edge.id != edges[1].id]
+    )
+    patches.assign_edges(wall.id, [edges[1].id])
+    meshes = [mesh_block(block, topology, model) for block in blocks]
+
+    with pytest.raises(ConnectivityError, match="not exterior"):
+        build_cfd_mesh(meshes, blocks, topology, model, patches)

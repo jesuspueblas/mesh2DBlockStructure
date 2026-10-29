@@ -1,5 +1,7 @@
 import math
 
+import pytest
+
 from meshcad.core.geometry.line import Line
 from meshcad.core.geometry.point import Point2D
 from meshcad.core.mesh.distribution import UniformDistribution
@@ -7,6 +9,7 @@ from meshcad.core.mesh.model import EdgeMeshSpec
 from meshcad.core.topology.block import Block
 from meshcad.core.topology.loop import Loop
 from meshcad.core.topology.topology import Topology
+from meshcad.gui.boundaries_panel import BoundariesPanel
 from meshcad.gui.document import Document
 
 
@@ -101,6 +104,91 @@ def test_document_patch_model_round_trip_and_version_3(qtbot):
     assert restored.patches.patches() == doc.patches.patches()
 
 
+def test_document_rejects_internal_edge_patch_assignment(qtbot):
+    doc = Document()
+    topology = doc.topology
+    vertices = [
+        topology.add_vertex(Point2D(*point))
+        for point in ((0, 0), (1, 0), (1, 1), (0, 1), (2, 0), (2, 1))
+    ]
+    v0, v1, v2, v3, v4, v5 = vertices
+    edges = [
+        topology.add_edge(v0, v1, Line(v0.point, v1.point)),
+        topology.add_edge(v1, v2, Line(v1.point, v2.point)),
+        topology.add_edge(v2, v3, Line(v2.point, v3.point)),
+        topology.add_edge(v3, v0, Line(v3.point, v0.point)),
+        topology.add_edge(v1, v4, Line(v1.point, v4.point)),
+        topology.add_edge(v4, v5, Line(v4.point, v5.point)),
+        topology.add_edge(v5, v2, Line(v5.point, v2.point)),
+    ]
+
+    left_loop = Loop()
+    for edge in edges[:4]:
+        left_loop.add_edge(edge.id)
+    right_loop = Loop()
+    for edge in edges[4:]:
+        right_loop.add_edge(edge.id)
+    right_loop.add_edge(edges[1].id, reversed=True)
+    doc.add_block(
+        Block(
+            doc.next_block_id(),
+            left_loop.split_at_corners(topology, [v.id for v in (v0, v1, v2, v3)]),
+        )
+    )
+    doc.add_block(
+        Block(
+            doc.next_block_id(),
+            right_loop.split_at_corners(topology, [v.id for v in (v1, v4, v5, v2)]),
+        )
+    )
+
+    patch = doc.add_mesh_patch("wall")
+    with pytest.raises(ValueError, match="Only exterior block edges"):
+        doc.assign_mesh_patch_edges(patch.id, [edges[1].id])
+
+    assert doc.patches.get_patch(patch.id).edge_ids == ()
+
+
+def test_document_accepts_exterior_edge_patch_assignment(qtbot):
+    doc = Document()
+    block = build_square_block(doc)
+    exterior_edge_id = block.sides[0].edge_ids()[0]
+    patch = doc.add_mesh_patch("wall")
+
+    doc.assign_mesh_patch_edges(patch.id, [exterior_edge_id])
+
+    assert doc.patches.get_patch(patch.id).edge_ids == (exterior_edge_id,)
+
+
+def test_boundaries_panel_reports_invalid_edge_assignment(qtbot, monkeypatch):
+    doc = Document()
+    patch = doc.add_mesh_patch("wall")
+
+    class SelectedEdges:
+        def selected_edge_ids(self):
+            return [42]
+
+    panel = BoundariesPanel(doc, SelectedEdges())
+    qtbot.addWidget(panel)
+    panel.list_widget.setCurrentRow(0)
+
+    def reject_assignment(*_args):
+        raise ValueError("Only exterior block edges can be assigned to mesh patches.")
+
+    monkeypatch.setattr(
+        doc,
+        "assign_mesh_patch_edges",
+        reject_assignment,
+    )
+
+    panel._assign()
+
+    assert panel.status.text() == (
+        "Only exterior block edges can be assigned to mesh patches."
+    )
+    assert doc.patches.get_patch(patch.id).edge_ids == ()
+
+
 def test_document_loads_version_1_without_patches(qtbot):
     doc = Document()
     data = doc.to_dict()
@@ -126,6 +214,10 @@ def test_patch_mutations_emit_signal(qtbot):
     doc = Document()
     with qtbot.waitSignal(doc.patches_changed, timeout=1000):
         patch = doc.add_mesh_patch("wall")
+    block = build_square_block(doc)
+    edge_ids = [
+        edge_id for side in block.sides for edge_id in side.edge_ids()
+    ]
     with qtbot.waitSignal(doc.patches_changed, timeout=1000):
-        doc.assign_mesh_patch_edges(patch.id, [1, 2])
-    assert doc.patches.get_patch(patch.id).edge_ids == (1, 2)
+        doc.assign_mesh_patch_edges(patch.id, edge_ids[:2])
+    assert doc.patches.get_patch(patch.id).edge_ids == tuple(edge_ids[:2])

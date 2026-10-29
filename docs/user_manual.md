@@ -205,6 +205,16 @@ Use incremental project names before large geometry changes.
 
 Keep the PVD file and its `_blocks` folder together because the collection uses relative paths.
 
+## Mesh Patches and Block Interfaces
+
+Only exterior block edges can be assigned to mesh patches. An edge shared by
+two blocks is an internal interface and cannot belong to a patch.
+
+The CFD JSON export keeps shared-interface faces as internal faces with an
+owner and neighbour; they are not assigned to boundary patches. VTK export
+writes one structured grid per block, so the shared interface remains part of
+each block grid rather than being exported as a boundary patch.
+
 ## Troubleshooting
 
 ### No loop is detected

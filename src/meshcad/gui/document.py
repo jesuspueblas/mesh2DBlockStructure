@@ -12,6 +12,7 @@ from meshcad.core.mesh.smoothing import SmoothingOptions
 from meshcad.core.mesh.model import EdgeMeshSpec, MeshModel, UniformDistribution
 from meshcad.core.topology.block import Block
 from meshcad.core.topology.topology import Topology
+from meshcad.core.topology.usage import external_edge_ids
 
 FORMAT = "meshcad-project"
 FORMAT_VERSION = 3
@@ -109,7 +110,27 @@ class Document(QObject):
         return patch
 
     def assign_mesh_patch_edges(self, patch_id: int, edge_ids):
-        patch = self.patches.assign_edges(patch_id, edge_ids)
+        requested_edge_ids = set(map(int, edge_ids))
+        existing_edge_ids = {edge.id for edge in self.topology.edges()}
+        unknown_edge_ids = requested_edge_ids - existing_edge_ids
+        if unknown_edge_ids:
+            raise ValueError(
+                "Cannot assign unknown edge IDs to a mesh patch: {}".format(
+                    ", ".join(map(str, sorted(unknown_edge_ids)))
+                )
+            )
+
+        exterior_ids = set(external_edge_ids(self.blocks))
+        invalid_edge_ids = requested_edge_ids - exterior_ids
+        if invalid_edge_ids:
+            raise ValueError(
+                "Only exterior block edges can be assigned to mesh patches. "
+                "Invalid edge IDs: {}".format(
+                    ", ".join(map(str, sorted(invalid_edge_ids)))
+                )
+            )
+
+        patch = self.patches.assign_edges(patch_id, requested_edge_ids)
         self.patches_changed.emit()
         return patch
 

@@ -33,7 +33,13 @@ class BoundariesPanel(QDockWidget):
         return [] if self.edges_panel is None else self.edges_panel.selected_edge_ids()
     def _assign(self):
         pid=self.selected_patch_id(); edges=self._selected_edges()
-        if pid is not None and edges:self.document.assign_mesh_patch_edges(pid,edges)
+        if pid is not None and edges:
+            try:
+                self.document.assign_mesh_patch_edges(pid, edges)
+            except ValueError as error:
+                self.status.setText(str(error))
+                return
+            self.status.setText("Assigned {} exterior edges.".format(len(edges)))
     def _remove(self):
         pid=self.selected_patch_id(); edges=self._selected_edges()
         if pid is not None and edges:self.document.unassign_mesh_patch_edges(pid,edges)
