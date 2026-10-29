@@ -1,16 +1,22 @@
 """Document: project state (topology, mesh, and blocks)."""
 
 from __future__ import annotations
+
+import math
+from collections.abc import Sequence
 from typing import Any, Dict, List, Tuple
 
 from PyQt5.QtCore import QObject, pyqtSignal
 from PyQt5.QtWidgets import QUndoStack
 
 from meshcad.core.boundary import PatchModel
+from meshcad.core.geometry.point import Point2D
+from meshcad.core.geometry.spline import Spline
 from meshcad.core.mesh.generator import BlockMesh, mesh_block
-from meshcad.core.mesh.smoothing import SmoothingOptions
 from meshcad.core.mesh.model import EdgeMeshSpec, MeshModel, UniformDistribution
+from meshcad.core.mesh.smoothing import SmoothingOptions
 from meshcad.core.topology.block import Block
+from meshcad.core.topology.edge import Edge
 from meshcad.core.topology.topology import Topology
 from meshcad.core.topology.usage import external_edge_ids
 
@@ -51,6 +57,38 @@ class Document(QObject):
     def add_block(self, block: Block) -> None:
         self.blocks.append(block)
         self.recompute_blocks()
+
+    def add_point_sequence(self, points: Sequence[Point2D]) -> Edge:
+        """Add an ordered point sequence as one interpolating spline edge."""
+        if len(points) < 2:
+            raise ValueError("The point sequence must contain at least two points.")
+        if any(
+            not math.isfinite(point.x)
+            or not math.isfinite(point.y)
+            for point in points
+        ):
+            raise ValueError("Point coordinates must be finite.")
+
+        first_vertex = self.topology.find_vertex_at(points[0])
+        last_vertex = self.topology.find_vertex_at(points[-1])
+        spline_points = list(points)
+        if first_vertex is not None:
+            spline_points[0] = first_vertex.point
+        if last_vertex is not None:
+            spline_points[-1] = last_vertex.point
+        if any(a == b for a, b in zip(spline_points, spline_points[1:])):
+            raise ValueError(
+                "Consecutive points must be distinct after connecting to existing vertices."
+            )
+
+        geometry = Spline(tuple(spline_points))
+        if first_vertex is None:
+            first_vertex = self.topology.add_vertex(geometry.start_point())
+        if last_vertex is None:
+            last_vertex = self.topology.add_vertex(geometry.end_point())
+        edge = self.topology.add_edge(first_vertex, last_vertex, geometry)
+        self.notify_change()
+        return edge
 
     def remove_block(self, block_id: int) -> None:
         self.blocks = [b for b in self.blocks if b.id != block_id]
@@ -198,8 +236,8 @@ class Document(QObject):
     def to_dict(self) -> Dict[str, Any]:
         from meshcad.io.json_io import (
             block_to_dict,
-            patch_model_to_dict,
             edge_spec_to_dict,
+            patch_model_to_dict,
             topology_to_dict,
         )
         return {
@@ -217,8 +255,8 @@ class Document(QObject):
     def from_dict(cls, data: Dict[str, Any]) -> "Document":
         from meshcad.io.json_io import (
             block_from_dict,
-            patch_model_from_dict,
             edge_spec_from_dict,
+            patch_model_from_dict,
             topology_from_dict,
         )
         if data.get("format") != FORMAT:

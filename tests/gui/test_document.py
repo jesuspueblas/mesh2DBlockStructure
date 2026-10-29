@@ -4,6 +4,7 @@ import pytest
 
 from meshcad.core.geometry.line import Line
 from meshcad.core.geometry.point import Point2D
+from meshcad.core.geometry.spline import Spline
 from meshcad.core.mesh.distribution import UniformDistribution
 from meshcad.core.mesh.model import EdgeMeshSpec
 from meshcad.core.topology.block import Block
@@ -159,6 +160,103 @@ def test_document_accepts_exterior_edge_patch_assignment(qtbot):
     doc.assign_mesh_patch_edges(patch.id, [exterior_edge_id])
 
     assert doc.patches.get_patch(patch.id).edge_ids == (exterior_edge_id,)
+
+
+def test_document_adds_point_sequence_as_single_spline_and_reuses_end_vertex(qtbot):
+    doc = Document()
+    existing_start = doc.topology.add_vertex(Point2D(5e-8, 0))
+    points = [Point2D(0, 0), Point2D(1, 2), Point2D(3, 1)]
+
+    edge = doc.add_point_sequence(points)
+
+    assert len(doc.topology.edges()) == 1
+    assert len(doc.topology.vertices()) == 2
+    assert edge.start_vertex_id == existing_start.id
+    assert isinstance(edge.geometry, Spline)
+    assert edge.geometry.points == (existing_start.point, *points[1:])
+    assert edge.geometry.get_grips() == [Point2D(1, 2)]
+    restored = Document.from_dict(doc.to_dict())
+    restored_edge = restored.topology.get_edge(edge.id)
+    assert restored_edge.geometry == edge.geometry
+
+
+def test_document_rejects_point_sequence_that_collapses_after_endpoint_snapping(qtbot):
+    doc = Document()
+    doc.topology.add_vertex(Point2D(0, 0))
+
+    with pytest.raises(ValueError, match="Consecutive points must be distinct"):
+        doc.add_point_sequence([Point2D(0, 0), Point2D(5e-8, 0)])
+
+    assert len(doc.topology.vertices()) == 1
+    assert doc.topology.edges() == []
+
+
+def test_main_window_imports_point_sequence_from_file(qtbot, monkeypatch, tmp_path):
+    from PyQt5.QtWidgets import QDialog
+
+    from meshcad.gui.main_window import MainWindow
+
+    path = tmp_path / "curve.csv"
+    path.write_text("X,Y\n0,0\n1,2\n3,1\n", encoding="utf-8")
+    window = MainWindow()
+    qtbot.addWidget(window)
+
+    monkeypatch.setattr(
+        "meshcad.gui.main_window.QFileDialog.getOpenFileName",
+        lambda *_args, **_kwargs: (str(path), ""),
+    )
+
+    class AcceptedPreview:
+        def __init__(self, points, _parent):
+            self.points = points
+
+        def exec_(self):
+            return QDialog.Accepted
+
+    monkeypatch.setattr(
+        "meshcad.gui.main_window.ImportPointSequenceDialog", AcceptedPreview
+    )
+
+    assert window.action_import_points.text() == "Import Point Sequence..."
+    window._on_import_point_sequence()
+
+    assert len(window.document.topology.edges()) == 1
+    edge = window.document.topology.edges()[0]
+    assert isinstance(edge.geometry, Spline)
+    assert len(edge.geometry.points) == 3
+    assert window.edges_panel.list_widget.count() == 1
+    assert "Imported 3 points as edge 0." == window.status_label.text()
+
+
+def test_main_window_cancelled_point_preview_does_not_import(qtbot, monkeypatch, tmp_path):
+    from PyQt5.QtWidgets import QDialog
+
+    from meshcad.gui.main_window import MainWindow
+
+    path = tmp_path / "curve.csv"
+    path.write_text("0,0\n1,2\n", encoding="utf-8")
+    window = MainWindow()
+    qtbot.addWidget(window)
+    monkeypatch.setattr(
+        "meshcad.gui.main_window.QFileDialog.getOpenFileName",
+        lambda *_args, **_kwargs: (str(path), ""),
+    )
+
+    class CancelledPreview:
+        def __init__(self, _points, _parent):
+            pass
+
+        def exec_(self):
+            return QDialog.Rejected
+
+    monkeypatch.setattr(
+        "meshcad.gui.main_window.ImportPointSequenceDialog", CancelledPreview
+    )
+
+    window._on_import_point_sequence()
+
+    assert window.document.topology.edges() == []
+    assert window.document.topology.vertices() == []
 
 
 def test_selecting_patch_highlights_its_edges_and_clears_previous_selection(qtbot):

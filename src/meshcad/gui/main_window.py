@@ -1,29 +1,46 @@
 """MeshCAD main window."""
 
+import csv
 import sys
 from pathlib import Path
 
-from PyQt5.QtCore import Qt, QTimer, QSize
+from PyQt5.QtCore import QSize, Qt, QTimer
 from PyQt5.QtGui import QColor, QIcon, QPainter, QPen, QPixmap
 from PyQt5.QtWidgets import (
-    QAction, QApplication, QDoubleSpinBox, QFileDialog, QLabel,
-    QActionGroup, QMainWindow, QMessageBox, QStatusBar, QToolBar, QDialog,
-    QVBoxLayout, QFormLayout, QDialogButtonBox, QCheckBox, QSpinBox, QStyle
+    QAction,
+    QActionGroup,
+    QApplication,
+    QCheckBox,
+    QDialog,
+    QDialogButtonBox,
+    QDoubleSpinBox,
+    QFileDialog,
+    QFormLayout,
+    QLabel,
+    QMainWindow,
+    QMessageBox,
+    QSpinBox,
+    QStatusBar,
+    QStyle,
+    QToolBar,
+    QVBoxLayout,
 )
 
 from meshcad.core.cfd import build_cfd_mesh
 from meshcad.core.geometry.point import Point2D
 from meshcad.core.mesh.smoothing import SmoothingOptions
 from meshcad.gui.blocks_panel import BlocksPanel
-from meshcad.gui.patches_panel import BoundariesPanel
 from meshcad.gui.canvas import CadCanvas
 from meshcad.gui.document import Document
 from meshcad.gui.edges_panel import EdgesPanel
+from meshcad.gui.import_points_dialog import ImportPointSequenceDialog
 from meshcad.gui.loops_panel import LoopsPanel
+from meshcad.gui.patches_panel import BoundariesPanel
 from meshcad.gui.tools.arc_tool import ArcTool
 from meshcad.gui.tools.line_tool import LineTool
 from meshcad.gui.tools.spline_tool import SplineTool
 from meshcad.io.cfd_mesh_io import write_cfd_mesh_json
+from meshcad.io.point_sequence import load_point_sequence
 from meshcad.io.project_io import load_project, save_project
 
 
@@ -94,6 +111,9 @@ class MainWindow(QMainWindow):
         self.action_open = QAction("Open...", self)
         self.action_open.triggered.connect(self._on_open)
         file_menu.addAction(self.action_open)
+        self.action_import_points = QAction("Import Point Sequence...", self)
+        self.action_import_points.triggered.connect(self._on_import_point_sequence)
+        file_menu.addAction(self.action_import_points)
         file_menu.addSeparator()
         self.action_save = QAction("Save", self)
         self.action_save.triggered.connect(self._on_save)
@@ -394,6 +414,35 @@ class MainWindow(QMainWindow):
         self.canvas.clear_mesh()
         self._update_title()
         self.status_label.setText("Project loaded: {}".format(path))
+
+    def _on_import_point_sequence(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Import Point Sequence",
+            "",
+            "Point Sequences (*.csv *.txt);;All Files (*)",
+        )
+        if not path:
+            return
+        try:
+            points = load_point_sequence(Path(path))
+        except (OSError, UnicodeError, ValueError, csv.Error) as error:
+            QMessageBox.critical(self, "Point Import Error", str(error))
+            return
+
+        preview = ImportPointSequenceDialog(points, self)
+        if preview.exec_() != QDialog.Accepted:
+            return
+        try:
+            edge = self.document.add_point_sequence(points)
+        except ValueError as error:
+            QMessageBox.critical(self, "Point Import Error", str(error))
+            return
+        self.canvas.set_tool(None)
+        self.canvas.reset_zoom()
+        self.status_label.setText(
+            "Imported {} points as edge {}.".format(len(points), edge.id)
+        )
 
     def _on_save(self) -> None:
         if self.current_path is None: self._on_save_as()

@@ -12,7 +12,8 @@ python -m meshcad
 
 The main window contains:
 
-- **File menu:** New, Open, Save, Save As, Export Mesh (VTK), and Exit.
+- **File menu:** New, Open, Import Point Sequence, Save, Save As, Export Mesh
+  (VTK), Export Mesh (JSON), and Exit.
 - **Toolbar:** Select, Line, Arc, Spline, Insert Point, Generate Mesh, Clear Mesh, Show Grid, Reset Zoom, and live mesh-improvement controls.
 - **Central canvas:** drawing, selection, geometry editing, zoom, pan, and mesh visualization.
 - **Loops panel:** closed-loop detection and block creation.
@@ -49,6 +50,34 @@ A dashed preview shows the candidate geometry while the pointer moves. Existing 
 The coordinate readout in the status bar helps place geometry against the
 visible grid. The selected drawing tool remains highlighted until another tool
 is selected; press **Esc** to cancel it and return to **Select**.
+
+### Import an Ordered Point Sequence
+
+Choose **File > Import Point Sequence** and select a CSV or TXT file containing
+two comma-separated coordinates per row:
+
+```text
+X,Y
+0.0,0.0
+1.0,0.5
+2.0,0.0
+```
+
+The optional header is `X,Y` (case-insensitive). Blank rows are ignored, but
+each data row must contain exactly two finite numbers. The points are used in
+file order; they are never sorted. At least two points are required, and
+consecutive duplicates are rejected.
+
+MeshCAD previews the interpolated curve, marks its start in green and end in
+red, and reports the number of input points. Confirm with **Import** to add the
+sequence as one spline edge. The first and last points are its topological
+endpoints; intermediate points are editable spline grips. If an endpoint lies
+within the topology tolerance of an existing vertex, it is connected to that
+vertex. No closure, smoothing, or point reduction is applied automatically.
+The imported curve can participate in a block loop when its endpoints connect
+to other geometry.
+
+![MeshCAD point-sequence import preview with the curve start marked in green and its end in red.](images/point-sequence-preview.png)
 
 ### 2. Edit Geometry
 
@@ -351,6 +380,7 @@ Generate the mesh before exporting.
 - **Middle-button drag:** pan the view.
 - **Mouse wheel:** zoom around the pointer.
 - **Esc:** cancel the active tool.
+- **File > Import Point Sequence:** preview and import an ordered CSV/TXT curve.
 
 ## Final Checklist
 
