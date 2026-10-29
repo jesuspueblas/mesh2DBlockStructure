@@ -461,6 +461,7 @@ class CadCanvas(QGraphicsView):
 
         pen = QPen(QColor(230, 230, 235))
         pen.setWidthF(0.5)
+        pen.setCosmetic(True)
         painter.setPen(pen)
 
         x = min_x
@@ -492,8 +493,10 @@ class CadCanvas(QGraphicsView):
         pen_v = QPen(QColor(200, 40, 40))
         brush_v = QBrush(QColor(255, 220, 220))
         for v in self.document.topology.vertices():
-            item = QGraphicsEllipseItem(v.point.x - VERTEX_RADIUS, v.point.y - VERTEX_RADIUS,
+            item = QGraphicsEllipseItem(-VERTEX_RADIUS, -VERTEX_RADIUS,
                                         VERTEX_RADIUS * 2, VERTEX_RADIUS * 2)
+            item.setPos(v.point.x, v.point.y)
+            item.setFlag(QGraphicsEllipseItem.ItemIgnoresTransformations, True)
             item.setPen(pen_v)
             item.setBrush(brush_v)
             item.setZValue(10.0)
@@ -504,8 +507,10 @@ class CadCanvas(QGraphicsView):
         brush_g = QBrush(QColor(200, 220, 255))
         for edge in self.document.topology.edges():
             for g in edge.geometry.get_grips():
-                item = QGraphicsEllipseItem(g.x - GRIP_RADIUS, g.y - GRIP_RADIUS,
+                item = QGraphicsEllipseItem(-GRIP_RADIUS, -GRIP_RADIUS,
                                             GRIP_RADIUS * 2, GRIP_RADIUS * 2)
+                item.setPos(g.x, g.y)
+                item.setFlag(QGraphicsEllipseItem.ItemIgnoresTransformations, True)
                 item.setPen(pen_g)
                 item.setBrush(brush_g)
                 item.setZValue(9.0)
