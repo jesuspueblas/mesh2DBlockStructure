@@ -81,6 +81,10 @@ In the **Distributions** panel:
 5. set **Bias** when a biased distribution is selected;
 6. click **Apply to Selected**.
 
+You can also select an edge by clicking it on the canvas. Hold **Ctrl** while
+clicking to add or remove individual edges from the selection. A regular click
+selects only that edge, and clicking empty canvas clears the selection.
+
 A shared edge has one distribution specification, so adjacent blocks automatically use the same interface nodes.
 
 #### Distribution Types

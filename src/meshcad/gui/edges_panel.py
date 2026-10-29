@@ -61,15 +61,16 @@ class EdgesPanel(QDockWidget):
 
         self.setWidget(container)
 
-    def select_edges(self, edge_ids: list) -> None:
+    def select_edges(self, edge_ids: list, toggle: bool = False) -> None:
         self.list_widget.blockSignals(True)
-        self.list_widget.clearSelection()
+        if not toggle:
+            self.list_widget.clearSelection()
         edges = self.document.topology.edges()
 
         for item_idx in range(self.list_widget.count()):
             item = self.list_widget.item(item_idx)
             if 0 <= item_idx < len(edges) and edges[item_idx].id in edge_ids:
-                item.setSelected(True)
+                item.setSelected(not item.isSelected() if toggle else True)
 
         self.list_widget.blockSignals(False)
         self._on_selection_changed()

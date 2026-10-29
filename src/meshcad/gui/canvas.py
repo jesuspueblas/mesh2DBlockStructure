@@ -19,7 +19,7 @@ SNAP_TOLERANCE = 8.0
 
 class CadCanvas(QGraphicsView):
     mouse_moved = pyqtSignal(float, float)
-    edge_clicked = pyqtSignal(int)
+    edge_clicked = pyqtSignal(int, bool)
 
     def __init__(self, document: Document, parent=None) -> None:
         super().__init__(parent)
@@ -182,8 +182,8 @@ class CadCanvas(QGraphicsView):
                 path.lineTo(p.x, p.y)
 
         item = QGraphicsPathItem(path)
-        pen = QPen(QColor(240, 140, 20))
-        pen.setWidthF(3.0)
+        pen = QPen(QColor(0, 190, 230))
+        pen.setWidthF(5.0)
         pen.setCosmetic(True)
         item.setPen(pen)
         item.setZValue(8.0)
@@ -324,12 +324,13 @@ class CadCanvas(QGraphicsView):
             items = self.items(event.pos())
             for item in items:
                 if isinstance(item, GeometryItem) and hasattr(item, 'edge_id'):
-                    self.edge_clicked.emit(item.edge_id)
+                    control_pressed = bool(event.modifiers() & Qt.ControlModifier)
+                    self.edge_clicked.emit(item.edge_id, control_pressed)
                     event.accept()
                     return
 
-            self.clear_highlight()
-            self.edge_clicked.emit(-1)
+            control_pressed = bool(event.modifiers() & Qt.ControlModifier)
+            self.edge_clicked.emit(-1, control_pressed)
 
         super().mousePressEvent(event)
 

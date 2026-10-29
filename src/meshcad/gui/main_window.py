@@ -77,11 +77,12 @@ class MainWindow(QMainWindow):
         self._create_toolbar()
         self._sync_mesh_controls_from_document()
 
-    def _on_edge_clicked(self, edge_id: int) -> None:
+    def _on_edge_clicked(self, edge_id: int, control_pressed: bool) -> None:
         if edge_id == -1:
-            self.edges_panel.list_widget.clearSelection()
+            if not control_pressed:
+                self.edges_panel.list_widget.clearSelection()
         else:
-            self.edges_panel.select_edges([edge_id])
+            self.edges_panel.select_edges([edge_id], toggle=control_pressed)
 
     def _create_menus(self) -> None:
         file_menu = self.menuBar().addMenu("&File")
