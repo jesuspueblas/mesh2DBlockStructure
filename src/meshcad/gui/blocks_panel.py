@@ -1,7 +1,19 @@
 """Panel listing blocks and the status of their opposite sides."""
 
 from __future__ import annotations
-from PyQt5.QtWidgets import QDockWidget, QLabel, QListWidget, QListWidgetItem, QVBoxLayout, QWidget, QPushButton, QAbstractItemView
+
+from PyQt5.QtWidgets import (
+    QAbstractItemView,
+    QDockWidget,
+    QLabel,
+    QListWidget,
+    QListWidgetItem,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+)
+
+from meshcad.gui.action_icons import configure_button
 from meshcad.gui.document import Document
 
 
@@ -18,6 +30,9 @@ class BlocksPanel(QDockWidget):
         layout.addWidget(self.list_widget)
 
         self.delete_button = QPushButton("Delete Selected Block")
+        configure_button(
+            self.delete_button, "delete_block", "Delete the selected block."
+        )
         self.delete_button.clicked.connect(self._on_delete)
         layout.addWidget(self.delete_button)
 

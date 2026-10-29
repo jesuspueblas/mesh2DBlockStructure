@@ -1,14 +1,36 @@
 """Editor for neutral exterior mesh patches."""
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QDockWidget,QWidget,QVBoxLayout,QHBoxLayout,QListWidget,QListWidgetItem,QPushButton,QInputDialog,QLabel
+from PyQt5.QtWidgets import (
+    QDockWidget,
+    QHBoxLayout,
+    QInputDialog,
+    QLabel,
+    QListWidget,
+    QListWidgetItem,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+)
+
+from meshcad.gui.action_icons import configure_button
+
 PATCH_ID_ROLE=Qt.UserRole
 class BoundariesPanel(QDockWidget):
     def __init__(self,document,edges_panel=None,parent=None):
         super().__init__("Mesh Patches",parent); self.document=document; self.edges_panel=edges_panel
         root=QWidget(); layout=QVBoxLayout(root); self.list_widget=QListWidget(); layout.addWidget(self.list_widget)
         row=QHBoxLayout(); self.new_button=QPushButton("New"); self.edit_button=QPushButton("Rename"); self.delete_button=QPushButton("Delete")
+        configure_button(self.new_button, "new", "Create a mesh patch.")
+        configure_button(self.edit_button, "rename", "Rename the selected mesh patch.")
+        configure_button(self.delete_button, "delete", "Delete the selected mesh patch.")
         for b in (self.new_button,self.edit_button,self.delete_button): row.addWidget(b)
         layout.addLayout(row); self.assign_button=QPushButton("Assign selected edges"); self.remove_button=QPushButton("Remove selected edges"); layout.addWidget(self.assign_button); layout.addWidget(self.remove_button); self.status=QLabel(); layout.addWidget(self.status); self.setWidget(root)
+        configure_button(
+            self.assign_button, "assign", "Assign selected edges to this mesh patch."
+        )
+        configure_button(
+            self.remove_button, "remove", "Remove selected edges from this mesh patch."
+        )
         self.list_widget.currentRowChanged.connect(self._on_selection_changed)
         self.new_button.clicked.connect(self._new); self.edit_button.clicked.connect(self._rename); self.delete_button.clicked.connect(self._delete); self.assign_button.clicked.connect(self._assign); self.remove_button.clicked.connect(self._remove)
         document.patches_changed.connect(self.refresh); self.refresh()

@@ -1,14 +1,27 @@
 """Panel for editing the mesh specification of each edge."""
 
 from __future__ import annotations
+
 from PyQt5.QtWidgets import (
-    QComboBox, QDockWidget, QDoubleSpinBox, QFormLayout, QLabel,
-    QListWidget, QListWidgetItem, QPushButton, QSpinBox, QVBoxLayout, QWidget, QAbstractItemView,
+    QAbstractItemView,
+    QComboBox,
+    QDockWidget,
+    QDoubleSpinBox,
+    QFormLayout,
     QInputDialog,
+    QLabel,
+    QListWidget,
+    QListWidgetItem,
+    QPushButton,
+    QSpinBox,
+    QVBoxLayout,
+    QWidget,
 )
+
 from meshcad.core.geometry.point import Point2D
 from meshcad.core.mesh.distribution import BiasedDistribution, UniformDistribution
 from meshcad.core.mesh.model import EdgeMeshSpec
+from meshcad.gui.action_icons import configure_button
 from meshcad.gui.document import Document
 from meshcad.gui.tools.split_edge_tool import SplitEdgeTool
 
@@ -23,6 +36,9 @@ class EdgesPanel(QDockWidget):
         layout = QVBoxLayout(container)
 
         self.refresh_button = QPushButton("Refresh Edges")
+        configure_button(
+            self.refresh_button, "refresh", "Refresh the edge list."
+        )
         self.refresh_button.clicked.connect(self.refresh)
         layout.addWidget(self.refresh_button)
 
@@ -51,18 +67,32 @@ class EdgesPanel(QDockWidget):
         layout.addLayout(form)
 
         self.apply_button = QPushButton("Apply to Selected")
+        configure_button(
+            self.apply_button, "apply", "Apply these settings to selected edges."
+        )
         self.apply_button.clicked.connect(self._on_apply)
         layout.addWidget(self.apply_button)
 
         self.delete_button = QPushButton("Delete Selected Edge(s)")
+        configure_button(
+            self.delete_button, "delete", "Delete selected edges not used by a block."
+        )
         self.delete_button.clicked.connect(self._on_delete)
         layout.addWidget(self.delete_button)
 
         self.split_button = QPushButton("Split Selected Edge by Clicking")
+        configure_button(
+            self.split_button, "split_click", "Split the selected edge by clicking on it."
+        )
         self.split_button.clicked.connect(self._on_split_by_click)
         layout.addWidget(self.split_button)
 
         self.split_coordinates_button = QPushButton("Split Selected Edge at Coordinates...")
+        configure_button(
+            self.split_coordinates_button,
+            "split_coordinates",
+            "Split the selected edge at entered X and Y coordinates.",
+        )
         self.split_coordinates_button.clicked.connect(self._on_split_at_coordinates)
         layout.addWidget(self.split_coordinates_button)
 

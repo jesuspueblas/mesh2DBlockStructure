@@ -16,6 +16,7 @@ from PyQt5.QtWidgets import (
     QDoubleSpinBox,
     QFileDialog,
     QFormLayout,
+    QHBoxLayout,
     QLabel,
     QMainWindow,
     QMessageBox,
@@ -24,11 +25,13 @@ from PyQt5.QtWidgets import (
     QStyle,
     QToolBar,
     QVBoxLayout,
+    QWidget,
 )
 
 from meshcad.core.cfd import build_cfd_mesh
 from meshcad.core.geometry.point import Point2D
 from meshcad.core.mesh.smoothing import SmoothingOptions
+from meshcad.gui.action_icons import action_icon
 from meshcad.gui.blocks_panel import BlocksPanel
 from meshcad.gui.canvas import CadCanvas
 from meshcad.gui.document import Document
@@ -143,8 +146,16 @@ class MainWindow(QMainWindow):
         file_menu.addAction(self.action_quit)
 
     def _create_toolbar(self) -> None:
-        toolbar = QToolBar("Tools", self)
-        self.addToolBar(toolbar)
+        geometry_toolbar = QToolBar("Geometry", self)
+        mesh_view_toolbar = QToolBar("Mesh and View", self)
+        mesh_options_toolbar = QToolBar("Mesh Options", self)
+        self.addToolBar(Qt.TopToolBarArea, geometry_toolbar)
+        self.addToolBarBreak(Qt.TopToolBarArea)
+        self.addToolBar(Qt.TopToolBarArea, mesh_view_toolbar)
+        self.addToolBar(Qt.TopToolBarArea, mesh_options_toolbar)
+        self.geometry_toolbar = geometry_toolbar
+        self.mesh_view_toolbar = mesh_view_toolbar
+        self.mesh_options_toolbar = mesh_options_toolbar
 
         self.action_select = QAction("Select", self)
         self._drawing_tool_actions = QActionGroup(self)
@@ -153,25 +164,25 @@ class MainWindow(QMainWindow):
         self._drawing_tool_actions.addAction(self.action_select)
         self.action_select.setChecked(True)
         self.action_select.triggered.connect(lambda: self.canvas.set_tool(None))
-        toolbar.addAction(self.action_select)
+        geometry_toolbar.addAction(self.action_select)
 
         self.action_line = QAction("Line", self)
         self.action_line.setCheckable(True)
         self._drawing_tool_actions.addAction(self.action_line)
         self.action_line.triggered.connect(lambda: self.canvas.set_tool(LineTool(self.canvas)))
-        toolbar.addAction(self.action_line)
+        geometry_toolbar.addAction(self.action_line)
 
         self.action_arc = QAction("Arc", self)
         self.action_arc.setCheckable(True)
         self._drawing_tool_actions.addAction(self.action_arc)
         self.action_arc.triggered.connect(lambda: self.canvas.set_tool(ArcTool(self.canvas)))
-        toolbar.addAction(self.action_arc)
+        geometry_toolbar.addAction(self.action_arc)
 
         self.action_spline = QAction("Spline", self)
         self.action_spline.setCheckable(True)
         self._drawing_tool_actions.addAction(self.action_spline)
         self.action_spline.triggered.connect(lambda: self.canvas.set_tool(SplineTool(self.canvas)))
-        toolbar.addAction(self.action_spline)
+        geometry_toolbar.addAction(self.action_spline)
 
         self.action_split_edge = QAction("Split Edge", self)
         self.action_split_edge.setCheckable(True)
@@ -179,79 +190,93 @@ class MainWindow(QMainWindow):
         self.action_split_edge.triggered.connect(
             self.edges_panel.begin_split_by_click
         )
-        toolbar.addAction(self.action_split_edge)
+        geometry_toolbar.addAction(self.action_split_edge)
 
         self.action_insert_point = QAction("Insert Point", self)
         self.action_insert_point.triggered.connect(self._on_insert_point)
-        toolbar.addAction(self.action_insert_point)
+        geometry_toolbar.addAction(self.action_insert_point)
 
-        toolbar.addSeparator()
         self.action_mesh = QAction("Generate Mesh", self)
         self.action_mesh.triggered.connect(self._on_generate_mesh)
-        toolbar.addAction(self.action_mesh)
+        mesh_view_toolbar.addAction(self.action_mesh)
 
         self.action_clear_mesh = QAction("Clear Mesh", self)
         self.action_clear_mesh.triggered.connect(self.canvas.clear_mesh)
-        toolbar.addAction(self.action_clear_mesh)
+        mesh_view_toolbar.addAction(self.action_clear_mesh)
 
-        toolbar.addSeparator()
         self.action_grid = QAction("Show Grid", self)
         self.action_grid.setCheckable(True)
         self.action_grid.setChecked(True)
         self.action_grid.triggered.connect(self._on_toggle_grid)
-        toolbar.addAction(self.action_grid)
+        mesh_view_toolbar.addAction(self.action_grid)
 
-        toolbar.addWidget(QLabel(" Spacing: "))
+        mesh_view_toolbar.addWidget(QLabel(" Spacing: "))
         self.grid_spin = QDoubleSpinBox()
         self.grid_spin.setRange(0.1, 100.0)
         self.grid_spin.setValue(10.0)
         self.grid_spin.valueChanged.connect(self._on_grid_spacing_changed)
-        toolbar.addWidget(self.grid_spin)
+        mesh_view_toolbar.addWidget(self.grid_spin)
 
-        toolbar.addSeparator()
         self.action_reset_zoom = QAction("Reset Zoom", self)
         self.action_reset_zoom.triggered.connect(self.canvas.reset_zoom)
-        toolbar.addAction(self.action_reset_zoom)
-
+        mesh_view_toolbar.addAction(self.action_reset_zoom)
 
         # --- live mesh controls ---
-        toolbar.addSeparator()
-        self.orthogonal_check = QCheckBox("Orthogonal")
-        self.orthogonal_check.setToolTip("Enforces perpendicularity near the boundary")
-        toolbar.addWidget(self.orthogonal_check)
-        toolbar.addWidget(QLabel(" Layers: "))
-        self.orthogonal_layers_spin = QSpinBox()
-        self.orthogonal_layers_spin.setRange(1, 20)
-        self.orthogonal_layers_spin.setMaximumWidth(58)
-        toolbar.addWidget(self.orthogonal_layers_spin)
-        toolbar.addWidget(QLabel(" Strength: "))
-        self.orthogonal_strength_spin = QDoubleSpinBox()
-        self.orthogonal_strength_spin.setRange(0.0, 1.0)
-        self.orthogonal_strength_spin.setSingleStep(0.05)
-        self.orthogonal_strength_spin.setDecimals(2)
-        self.orthogonal_strength_spin.setMaximumWidth(72)
-        toolbar.addWidget(self.orthogonal_strength_spin)
-        toolbar.addWidget(QLabel(" Smoothing: "))
+        mesh_options_toolbar.addWidget(QLabel(" Smoothing: "))
         self.smoothing_iterations_spin = QSpinBox()
         self.smoothing_iterations_spin.setRange(0, 2000)
         self.smoothing_iterations_spin.setSingleStep(5)
         self.smoothing_iterations_spin.setMaximumWidth(72)
-        toolbar.addWidget(self.smoothing_iterations_spin)
-        toolbar.addWidget(QLabel(" Relaxation: "))
+        mesh_options_toolbar.addWidget(self.smoothing_iterations_spin)
+        mesh_options_toolbar.addWidget(QLabel(" Relaxation: "))
         self.smoothing_relaxation_spin = QDoubleSpinBox()
         self.smoothing_relaxation_spin.setRange(0.05, 1.0)
         self.smoothing_relaxation_spin.setSingleStep(0.05)
         self.smoothing_relaxation_spin.setDecimals(2)
         self.smoothing_relaxation_spin.setMaximumWidth(72)
-        toolbar.addWidget(self.smoothing_relaxation_spin)
+        mesh_options_toolbar.addWidget(self.smoothing_relaxation_spin)
+
+        self.orthogonal_check = QCheckBox("Orthogonal")
+        self.orthogonal_check.setIcon(action_icon("orthogonal"))
+        self.orthogonal_check.setIconSize(QSize(18, 18))
+        self.orthogonal_check.setToolTip("Enforces perpendicularity near the boundary")
+        mesh_options_toolbar.addWidget(self.orthogonal_check)
+
+        self.orthogonal_controls = QWidget(mesh_options_toolbar)
+        orthogonal_layout = QHBoxLayout(self.orthogonal_controls)
+        orthogonal_layout.setContentsMargins(0, 0, 0, 0)
+        orthogonal_layout.setSpacing(4)
+        orthogonal_layout.addWidget(QLabel("Layers:"))
+        self.orthogonal_layers_spin = QSpinBox()
+        self.orthogonal_layers_spin.setRange(1, 20)
+        self.orthogonal_layers_spin.setMaximumWidth(58)
+        orthogonal_layout.addWidget(self.orthogonal_layers_spin)
+        orthogonal_layout.addWidget(QLabel("Strength:"))
+        self.orthogonal_strength_spin = QDoubleSpinBox()
+        self.orthogonal_strength_spin.setRange(0.0, 1.0)
+        self.orthogonal_strength_spin.setSingleStep(0.05)
+        self.orthogonal_strength_spin.setDecimals(2)
+        self.orthogonal_strength_spin.setMaximumWidth(72)
+        orthogonal_layout.addWidget(self.orthogonal_strength_spin)
+        self.orthogonal_controls_action = mesh_options_toolbar.addWidget(
+            self.orthogonal_controls
+        )
+        self.orthogonal_controls_action.setVisible(
+            self.orthogonal_check.isChecked()
+        )
+        self.orthogonal_check.toggled.connect(
+            self.orthogonal_controls_action.setVisible
+        )
+
         self.orthogonal_check.toggled.connect(self._schedule_live_mesh_update)
         for control in (self.orthogonal_layers_spin,
                         self.orthogonal_strength_spin,
                         self.smoothing_iterations_spin,
                         self.smoothing_relaxation_spin):
             control.valueChanged.connect(self._schedule_live_mesh_update)
-        toolbar.addSeparator()
-        self._decorate_toolbar(toolbar)
+        self._decorate_toolbar(geometry_toolbar, "main_toolbar")
+        self._decorate_toolbar(mesh_view_toolbar, "mesh_view_toolbar")
+        self._decorate_toolbar(mesh_options_toolbar, "mesh_options_toolbar")
 
     def _on_canvas_tool_changed(self, tool) -> None:
         active_action = self.action_select
@@ -326,9 +351,9 @@ class MainWindow(QMainWindow):
         painter.end()
         return QIcon(pixmap)
 
-    def _decorate_toolbar(self, toolbar: QToolBar) -> None:
+    def _decorate_toolbar(self, toolbar: QToolBar, object_name: str) -> None:
         """Apply icons, visual shortcuts, and tooltips to the toolbar."""
-        toolbar.setObjectName("main_toolbar")
+        toolbar.setObjectName(object_name)
         toolbar.setMovable(True)
         toolbar.setFloatable(False)
         toolbar.setIconSize(QSize(24, 24))
@@ -341,20 +366,30 @@ class MainWindow(QMainWindow):
             "QToolButton:pressed { background: #BFDBFE; }"
             "QToolButton:checked { background: #BFDBFE; border: 1px solid #2563EB; }"
         )
+        toolbar.setAllowedAreas(
+            Qt.TopToolBarArea | Qt.BottomToolBarArea | Qt.LeftToolBarArea
+            | Qt.RightToolBarArea
+        )
 
         entries = (
             (self.action_select, "select", "Select and edit geometry", "Select edges or drag vertices and control points."),
             (self.action_line, "line", "Draw a line", "Create a segment with two clicks: start and end."),
             (self.action_arc, "arc", "Draw a circular arc", "Create an arc with three clicks: center, start, and end."),
             (self.action_spline, "spline", "Draw a spline", "Add points with left-click and finish with right-click."),
+            (self.action_split_edge, "split", "Split an edge", "Split the selected edge at a clicked or entered point."),
             (self.action_insert_point, "point", "Insert point by coordinates", "Insert a vertex by entering its X and Y coordinates."),
             (self.action_mesh, "mesh", "Generate Mesh", "Generate or update the structured mesh for all blocks."),
             (self.action_clear_mesh, "clear_mesh", "Hide mesh", "Remove the mesh from the canvas without deleting CAD geometry."),
             (self.action_grid, "grid", "Show or hide grid", "Show or hide the canvas reference grid."),
             (self.action_reset_zoom, "zoom", "Fit all", "Center and fit all geometry in the visible area."),
         )
+        self.action_split_edge.setStatusTip("Split the selected edge at a point.")
         for action, icon_name, status_tip, tool_tip in entries:
-            action.setIcon(self._cad_icon(icon_name))
+            action.setIcon(
+                action_icon(icon_name)
+                if icon_name == "split"
+                else self._cad_icon(icon_name)
+            )
             action.setToolTip(tool_tip)
             action.setStatusTip(status_tip)
 

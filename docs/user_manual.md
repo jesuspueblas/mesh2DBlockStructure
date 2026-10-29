@@ -15,7 +15,7 @@ The main window contains:
 - **File menu:** New, Open, Import Point Sequence, Save, Save As, Export Mesh
   (VTK), Export Mesh (JSON), and Exit.
 - **Edit menu:** Undo and Redo for document edits.
-- **Toolbar:** Select, Line, Arc, Spline, Split Edge, Insert Point, Generate Mesh, Clear Mesh, Show Grid, Reset Zoom, and live mesh-improvement controls.
+- **Toolbars:** Geometry is on the first row; Mesh and View and Mesh Options share the second row. Each toolbar can be moved independently. Orthogonal layer and strength controls appear when **Orthogonal** is enabled.
 - **Central canvas:** drawing, selection, geometry editing, zoom, pan, and mesh visualization.
 - **Loops panel:** closed-loop detection and block creation.
 - **Distributions panel:** edge selection, node counts, and distribution settings.
