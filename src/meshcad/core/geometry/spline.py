@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass
 from typing import List, Tuple
 
@@ -82,3 +81,96 @@ class Spline(GeometryEntity):
 
     def get_grips(self) -> List[Point2D]:
         return list(self.points[1:-1])
+
+
+@dataclass(frozen=True)
+class SplineSegment(GeometryEntity):
+    """A parameter-range view of a spline, preserving its exact shape."""
+
+    spline: Spline
+    start_t: float
+    end_t: float
+    start_offset: Point2D = Point2D(0.0, 0.0)
+    end_offset: Point2D = Point2D(0.0, 0.0)
+
+    def __post_init__(self):
+        if not 0.0 <= self.start_t < self.end_t <= 1.0:
+            raise ValueError("Spline segment parameters must satisfy 0 <= start < end <= 1")
+
+    def start_point(self) -> Point2D:
+        return self.evaluate(0.0)
+
+    def end_point(self) -> Point2D:
+        return self.evaluate(1.0)
+
+    def length(self) -> float:
+        points = self.sample(200)
+        return sum(
+            points[i].distance_to(points[i + 1])
+            for i in range(len(points) - 1)
+        )
+
+    def evaluate(self, t: float) -> Point2D:
+        t = max(0.0, min(1.0, t))
+        point = self.spline.evaluate(
+            self.start_t + (self.end_t - self.start_t) * t
+        )
+        return Point2D(
+            point.x + self.start_offset.x * (1.0 - t) + self.end_offset.x * t,
+            point.y + self.start_offset.y * (1.0 - t) + self.end_offset.y * t,
+        )
+
+    def sample(self, n: int) -> List[Point2D]:
+        if n < 2:
+            raise ValueError("n must be >= 2")
+        return [self.evaluate(i / (n - 1)) for i in range(n)]
+
+    def bounding_box(self) -> Tuple[Point2D, Point2D]:
+        points = self.sample(200)
+        xs = [point.x for point in points]
+        ys = [point.y for point in points]
+        return Point2D(min(xs), min(ys)), Point2D(max(xs), max(ys))
+
+    def get_grips(self) -> List[Point2D]:
+        point_count = len(self.spline.points)
+        return [
+            self.spline.points[index]
+            for index in range(1, point_count - 1)
+            if self.start_t < index / (point_count - 1) < self.end_t
+        ]
+
+    def with_endpoints(self, start: Point2D, end: Point2D) -> SplineSegment:
+        current_start = self.start_point()
+        current_end = self.end_point()
+        return SplineSegment(
+            self.spline,
+            self.start_t,
+            self.end_t,
+            Point2D(
+                self.start_offset.x + start.x - current_start.x,
+                self.start_offset.y + start.y - current_start.y,
+            ),
+            Point2D(
+                self.end_offset.x + end.x - current_end.x,
+                self.end_offset.y + end.y - current_end.y,
+            ),
+        )
+
+    def with_grip(self, grip_index: int, point: Point2D) -> SplineSegment:
+        point_count = len(self.spline.points)
+        indices = [
+            index
+            for index in range(1, point_count - 1)
+            if self.start_t < index / (point_count - 1) < self.end_t
+        ]
+        control_index = indices[grip_index]
+        points = list(self.spline.points)
+        points[control_index] = point
+        updated = SplineSegment(
+            Spline(tuple(points)),
+            self.start_t,
+            self.end_t,
+            self.start_offset,
+            self.end_offset,
+        )
+        return updated.with_endpoints(self.start_point(), self.end_point())

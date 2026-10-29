@@ -45,6 +45,16 @@ class PatchModel:
     def discard_edges(self,edge_ids):
         ids=set(map(int,edge_ids))
         for p in self.patches(): self._patches[p.id]=replace(p,edge_ids=tuple(e for e in p.edge_ids if e not in ids))
+    def replace_edge(self,edge_id,new_edge_ids):
+        edge_id=int(edge_id); replacements=tuple(map(int,new_edge_ids))
+        for patch in self.patches():
+            if edge_id in patch.edge_ids:
+                edge_ids=tuple(
+                    replacement
+                    for current in patch.edge_ids
+                    for replacement in (replacements if current==edge_id else (current,))
+                )
+                self._patches[patch.id]=replace(patch,edge_ids=edge_ids)
     def validate(self,blocks):
         usage=find_edge_uses(blocks); external={e for e,u in usage.items() if len(u)==1}; assigned={e for p in self.patches() for e in p.edge_ids}
         issues=[]

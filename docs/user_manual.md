@@ -14,7 +14,7 @@ The main window contains:
 
 - **File menu:** New, Open, Import Point Sequence, Save, Save As, Export Mesh
   (VTK), Export Mesh (JSON), and Exit.
-- **Toolbar:** Select, Line, Arc, Spline, Insert Point, Generate Mesh, Clear Mesh, Show Grid, Reset Zoom, and live mesh-improvement controls.
+- **Toolbar:** Select, Line, Arc, Spline, Split Edge, Insert Point, Generate Mesh, Clear Mesh, Show Grid, Reset Zoom, and live mesh-improvement controls.
 - **Central canvas:** drawing, selection, geometry editing, zoom, pan, and mesh visualization.
 - **Loops panel:** closed-loop detection and block creation.
 - **Distributions panel:** edge selection, node counts, and distribution settings.
@@ -102,9 +102,9 @@ If no loop is detected:
 
 ### 4. Create a Structured Block
 
-Select a loop and click **Create Block from Loop**. Click four distinct loop vertices. These vertices define the four logical corners. The portions of the loop between consecutive corners become the four block sides.
+Select a loop and click **Create Block from Loop**. Click four distinct loop vertices to define the four logical corners. The portions of the loop between consecutive corners become the four block sides. A loop may contain more than four edges: choose four corner vertices, and all intervening edges are grouped into the corresponding side. For example, a five-edge loop can make a block by choosing four of its vertices; one side will contain two consecutive edges.
 
-A block side may contain one or several CAD edges.
+A block side may contain one or several CAD edges. The number of contour edges does not need to be four; the block itself always has four logical sides.
 
 ### 5. Configure Edge Distributions
 
@@ -122,6 +122,29 @@ clicking to add or remove individual edges from the selection. A regular click
 selects only that edge, and clicking empty canvas clears the selection.
 
 A shared edge has one distribution specification, so adjacent blocks automatically use the same interface nodes.
+Changing its node count updates the opposite sides of every block that uses
+that edge. When an opposite side contains multiple edges, the required
+intervals are distributed across them in proportion to their lengths.
+If the selected edge is shared by several blocks, all affected opposite sides
+are updated together. When applying multiple edge specifications, requested
+values are kept fixed; if they conflict with a block's required side total,
+MeshCAD reports the conflict and leaves the existing settings unchanged.
+
+#### Split an Edge
+
+Select exactly one edge in the **Distributions** panel. Choose **Split Edge**
+on the toolbar or **Split Selected Edge by Clicking** in the panel, then click
+within the selected edge on the canvas. Alternatively, choose **Split Selected
+Edge at Coordinates...** and enter a point on the edge. A point at or too near
+an endpoint is rejected.
+
+The split creates two consecutive edges and keeps the original curve shape.
+Any block side using the edge is updated to use both edges, including shared
+block interfaces, and an exterior mesh patch remains assigned to both
+resulting edges. The existing node intervals are distributed according to
+the relative lengths of the two segments; one additional node is created at
+the split. Opposite block sides are adjusted as needed to keep their node
+totals compatible.
 
 #### Distribution Types
 
@@ -307,6 +330,35 @@ export the mesh for visualization or CFD.
    not as boundary patches.
 10. If an export is unavailable, confirm that a valid block and generated
     mesh exist, correct all block mismatches, and try again.
+
+### Tutorial 5: Split a Shared Edge and Rebalance the Mesh
+
+**Goal:** Split the interface shared by two blocks, then change one of its
+segments and verify that both blocks remain compatible.
+
+1. Complete Tutorial 2 and confirm that both blocks show
+   `OK (nodes 9 x 6)`. Save a copy of the project before experimenting.
+2. In **Distributions**, select the shared vertical interface. Confirm that
+   the cyan highlight covers the internal edge between the blocks.
+3. Click **Split Edge** on the toolbar, then click near the middle of the
+   highlighted interface. Alternatively, use **Split Selected Edge at
+   Coordinates...** and enter a point on the interface.
+4. The interface becomes two consecutive edges. Both blocks continue to use
+   the same pair of edges, in opposite traversal directions, and their mesh
+   status should remain `OK`. The split point adds a node to the interface;
+   the former edge's intervals are apportioned between the two new segments
+   according to their lengths.
+5. In **Distributions**, select one of the two new interface segments. Set
+   **Nodes** to `5` and click **Apply to Selected**.
+6. Check the **Blocks** panel. Both blocks should still report `OK`: the
+   interface is shared, so the change affects both blocks, and the opposite
+   side of each block is adjusted to match. If an opposite side has several
+   edges, its intervals are distributed among those edges in proportion to
+   their lengths.
+7. Click **Generate Mesh**. Confirm that both grids appear and meet along the
+   split interface without a node-count mismatch.
+8. Use **File > Save As** to save the split-interface project under a new
+   name, preserving the original baseline project.
 
 ## Saving Projects
 

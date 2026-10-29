@@ -2,6 +2,7 @@ import pytest
 
 from meshcad.core.geometry.line import Line
 from meshcad.core.geometry.point import Point2D
+from meshcad.core.geometry.spline import Spline, SplineSegment
 from meshcad.core.topology.topology import Topology
 
 
@@ -80,6 +81,23 @@ def test_edges_unique_ids():
     assert e0.id != e1.id
 
 
+def test_edge_ids_remain_monotonic_after_removing_highest_id():
+    t = Topology()
+    vertices = [t.add_vertex(Point2D(i, 0)) for i in range(3)]
+    edges = [
+        t.add_edge(vertices[0], vertices[1], Line(vertices[0].point, vertices[1].point)),
+        t.add_edge(vertices[1], vertices[2], Line(vertices[1].point, vertices[2].point)),
+        t.add_edge(vertices[2], vertices[0], Line(vertices[2].point, vertices[0].point)),
+    ]
+
+    t.remove_edge(edges[-1].id)
+    next_edge = t.add_edge(
+        vertices[0], vertices[2], Line(vertices[0].point, vertices[2].point)
+    )
+
+    assert next_edge.id == edges[-1].id + 1
+
+
 def test_len_and_listing():
     t = Topology()
     v0 = t.add_vertex(Point2D(0, 0))
@@ -88,3 +106,92 @@ def test_len_and_listing():
     assert len(t) == 3
     assert len(t.vertices()) == 2
     assert len(t.edges()) == 1
+
+
+def test_split_edge_preserves_line_geometry_and_original_id():
+    topology = Topology()
+    start = topology.add_vertex(Point2D(0, 0))
+    end = topology.add_vertex(Point2D(4, 0))
+    edge = topology.add_edge(start, end, Line(start.point, end.point))
+
+    first, second = topology.split_edge(edge.id, 0.25)
+
+    assert first.id == edge.id
+    assert first.geometry.end_point() == Point2D(1, 0)
+    assert second.geometry.start_point() == Point2D(1, 0)
+    assert second.geometry.end_point() == Point2D(4, 0)
+
+
+def test_split_edge_preserves_arc_shape():
+    from meshcad.core.geometry.arc import Arc
+    import math
+
+    topology = Topology()
+    geometry = Arc(Point2D(0, 0), 2, 0, math.pi)
+    start = topology.add_vertex(geometry.start_point())
+    end = topology.add_vertex(geometry.end_point())
+    edge = topology.add_edge(start, end, geometry)
+
+    first, second = topology.split_edge(edge.id, 0.4)
+
+    for i in range(11):
+        t = i / 10
+        if t <= 0.4:
+            expected = geometry.evaluate(t)
+            actual = first.geometry.evaluate(t / 0.4)
+        else:
+            expected = geometry.evaluate(t)
+            actual = second.geometry.evaluate((t - 0.4) / 0.6)
+        assert actual.distance_to(expected) < 1e-9
+
+
+def test_split_edge_preserves_spline_shape():
+    topology = Topology()
+    geometry = Spline(
+        (Point2D(0, 0), Point2D(1, 2), Point2D(2, -1), Point2D(3, 0))
+    )
+    start = topology.add_vertex(geometry.start_point())
+    end = topology.add_vertex(geometry.end_point())
+    edge = topology.add_edge(start, end, geometry)
+
+    first, second = topology.split_edge(edge.id, 0.43)
+
+    assert isinstance(first.geometry, SplineSegment)
+    assert isinstance(second.geometry, SplineSegment)
+    for i in range(11):
+        t = i / 10
+        if t <= 0.43:
+            expected = geometry.evaluate(t)
+            actual = first.geometry.evaluate(t / 0.43)
+        else:
+            expected = geometry.evaluate(t)
+            actual = second.geometry.evaluate((t - 0.43) / 0.57)
+        assert actual.distance_to(expected) < 1e-9
+
+
+def test_split_spline_segments_remain_connected_when_split_vertex_moves():
+    topology = Topology()
+    geometry = Spline(
+        (Point2D(0, 0), Point2D(1, 2), Point2D(2, -1), Point2D(3, 0))
+    )
+    start = topology.add_vertex(geometry.start_point())
+    end = topology.add_vertex(geometry.end_point())
+    edge = topology.add_edge(start, end, geometry)
+    first, second = topology.split_edge(edge.id, 0.43)
+    split_vertex_id = first.end_vertex_id
+
+    moved = Point2D(1.2, 0.3)
+    topology.move_vertex(split_vertex_id, moved)
+
+    assert topology.get_edge(first.id).geometry.end_point().distance_to(moved) < 1e-12
+    assert topology.get_edge(second.id).geometry.start_point().distance_to(moved) < 1e-12
+
+
+def test_split_side_preserves_reversed_traversal():
+    from meshcad.core.topology.block_side import BlockSide
+    from meshcad.core.topology.edge import OrientedEdge
+
+    side = BlockSide((OrientedEdge(2, reversed=True),))
+    split = Topology.replace_edge_in_side(side, 2, 5)
+
+    assert split == (OrientedEdge(5, True), OrientedEdge(2, True))

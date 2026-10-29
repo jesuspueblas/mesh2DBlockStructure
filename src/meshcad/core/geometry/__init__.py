@@ -5,7 +5,7 @@ from meshcad.core.geometry.vector import Vector2D
 from meshcad.core.geometry.entity import GeometryEntity
 from meshcad.core.geometry.line import Line
 from meshcad.core.geometry.arc import Arc
-from meshcad.core.geometry.spline import Spline
+from meshcad.core.geometry.spline import Spline, SplineSegment
 
 __all__ = [
     "Point2D",
@@ -14,4 +14,5 @@ __all__ = [
     "Line",
     "Arc",
     "Spline",
+    "SplineSegment",
 ]

@@ -1,3 +1,5 @@
+from PyQt5.QtCore import QPointF, Qt
+
 from meshcad.core.geometry.line import Line
 from meshcad.core.geometry.point import Point2D
 from meshcad.gui.document import Document
@@ -61,6 +63,48 @@ def test_main_window_has_mesh_json_export_action(qtbot):
     window = MainWindow()
     qtbot.addWidget(window)
     assert window.action_export_cfd_json.text() == "Export Mesh (JSON)..."
+
+
+def test_split_edge_toolbar_tool_clicks_selected_edge(qtbot):
+    window = MainWindow()
+    qtbot.addWidget(window)
+    window.show()
+    edge = window.canvas.add_geometry(
+        Line(Point2D(0, 0), Point2D(4, 0))
+    )
+    window.edges_panel.select_edges([edge.id])
+
+    qtbot.mouseClick(window.edges_panel.split_button, Qt.LeftButton)
+
+    assert window.action_split_edge.isChecked()
+    assert window.canvas.tool is not None
+    click_position = window.canvas.mapFromScene(QPointF(2, 0))
+    qtbot.mouseClick(
+        window.canvas.viewport(), Qt.LeftButton, pos=click_position
+    )
+
+    assert len(window.document.topology.edges()) == 2
+    assert window.action_select.isChecked()
+    assert not window.action_split_edge.isChecked()
+
+
+def test_split_edge_coordinate_entry(qtbot, monkeypatch):
+    window = MainWindow()
+    qtbot.addWidget(window)
+    edge = window.canvas.add_geometry(
+        Line(Point2D(0, 0), Point2D(4, 0))
+    )
+    window.edges_panel.select_edges([edge.id])
+    coordinates = iter(((1.5, True), (0.0, True)))
+    monkeypatch.setattr(
+        "meshcad.gui.edges_panel.QInputDialog.getDouble",
+        lambda *args, **kwargs: next(coordinates),
+    )
+
+    qtbot.mouseClick(window.edges_panel.split_coordinates_button, Qt.LeftButton)
+
+    assert len(window.document.topology.edges()) == 2
+    assert window.edges_panel.status.text() == "Edge split into edges 0 and 1."
 
 
 def test_cfd_json_export_cancel_does_not_generate_mesh(qtbot, monkeypatch):

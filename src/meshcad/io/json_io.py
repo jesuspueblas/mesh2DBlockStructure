@@ -8,7 +8,7 @@ from meshcad.core.geometry.arc import Arc
 from meshcad.core.geometry.entity import GeometryEntity
 from meshcad.core.geometry.line import Line
 from meshcad.core.geometry.point import Point2D
-from meshcad.core.geometry.spline import Spline
+from meshcad.core.geometry.spline import Spline, SplineSegment
 from meshcad.core.mesh.distribution import (
     BiasedDistribution,
     NodeDistribution,
@@ -56,6 +56,15 @@ def geometry_to_dict(g: GeometryEntity) -> Dict[str, Any]:
             "type": "spline",
             "points": [_point_to_list(p) for p in g.points],
         }
+    if isinstance(g, SplineSegment):
+        return {
+            "type": "spline_segment",
+            "points": [_point_to_list(p) for p in g.spline.points],
+            "start_t": g.start_t,
+            "end_t": g.end_t,
+            "start_offset": _point_to_list(g.start_offset),
+            "end_offset": _point_to_list(g.end_offset),
+        }
     raise TypeError("Non-serializable geometry type: {}".format(type(g).__name__))
 
 
@@ -73,6 +82,15 @@ def geometry_from_dict(data: Dict[str, Any]) -> GeometryEntity:
     if t == "spline":
         pts = tuple(_point_from_list(p) for p in data["points"])
         return Spline(pts)
+    if t == "spline_segment":
+        spline = Spline(tuple(_point_from_list(p) for p in data["points"]))
+        return SplineSegment(
+            spline,
+            float(data["start_t"]),
+            float(data["end_t"]),
+            _point_from_list(data.get("start_offset", [0.0, 0.0])),
+            _point_from_list(data.get("end_offset", [0.0, 0.0])),
+        )
     raise ValueError("Unknown geometry type: {!r}".format(t))
 
 

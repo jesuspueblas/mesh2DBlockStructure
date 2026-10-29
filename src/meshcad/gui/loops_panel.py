@@ -62,7 +62,10 @@ class LoopsPanel(QDockWidget):
         tool = CornerPickerTool(self.canvas, loop, self._on_corners_picked)
         self.canvas.set_tool(tool)
         self._active_loop = loop
-        self.status.setText("Click four vertices on the loop.")
+        self.status.setText(
+            "Click four loop vertices for the block corners. Any additional "
+            "loop edges between corners will form part of that block side."
+        )
 
     def _on_corners_picked(self, corner_ids) -> None:
         loop = self._active_loop

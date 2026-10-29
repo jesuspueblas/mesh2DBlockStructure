@@ -3,11 +3,14 @@
 from __future__ import annotations
 from PyQt5.QtWidgets import (
     QComboBox, QDockWidget, QDoubleSpinBox, QFormLayout, QLabel,
-    QListWidget, QListWidgetItem, QPushButton, QSpinBox, QVBoxLayout, QWidget, QAbstractItemView
+    QListWidget, QListWidgetItem, QPushButton, QSpinBox, QVBoxLayout, QWidget, QAbstractItemView,
+    QInputDialog,
 )
+from meshcad.core.geometry.point import Point2D
 from meshcad.core.mesh.distribution import BiasedDistribution, UniformDistribution
 from meshcad.core.mesh.model import EdgeMeshSpec
 from meshcad.gui.document import Document
+from meshcad.gui.tools.split_edge_tool import SplitEdgeTool
 
 
 class EdgesPanel(QDockWidget):
@@ -54,6 +57,14 @@ class EdgesPanel(QDockWidget):
         self.delete_button = QPushButton("Delete Selected Edge(s)")
         self.delete_button.clicked.connect(self._on_delete)
         layout.addWidget(self.delete_button)
+
+        self.split_button = QPushButton("Split Selected Edge by Clicking")
+        self.split_button.clicked.connect(self._on_split_by_click)
+        layout.addWidget(self.split_button)
+
+        self.split_coordinates_button = QPushButton("Split Selected Edge at Coordinates...")
+        self.split_coordinates_button.clicked.connect(self._on_split_at_coordinates)
+        layout.addWidget(self.split_coordinates_button)
 
         self.status = QLabel("Refresh to display edges.")
         self.status.setWordWrap(True)
@@ -145,7 +156,11 @@ class EdgesPanel(QDockWidget):
                     dist = UniformDistribution()
                 specs.append(EdgeMeshSpec(edge.id, self.nodes_spin.value(), dist))
 
-        self.document.set_edge_specs(specs)
+        try:
+            self.document.set_edge_specs(specs)
+        except ValueError as error:
+            self.status.setText("Could not update edge distributions: {}".format(error))
+            return
         self.refresh()
         self.status.setText("{} edges updated.".format(len(specs)))
 
@@ -170,6 +185,69 @@ class EdgesPanel(QDockWidget):
             self.status.setText("{} edges deleted. {} could not be deleted because they belong to a block.".format(success, fail))
         else:
             self.status.setText("{} edges deleted.".format(success))
+
+    def _selected_edge_for_split(self):
+        edge_ids = self.selected_edge_ids()
+        if len(edge_ids) != 1:
+            self.status.setText("Select exactly one edge to split.")
+            return None
+        return self.document.topology.get_edge(edge_ids[0])
+
+    def begin_split_by_click(self) -> None:
+        edge = self._selected_edge_for_split()
+        if edge is None:
+            self.canvas.set_tool(None)
+            return
+        self.canvas.set_tool(
+            SplitEdgeTool(
+                self.canvas,
+                edge.id,
+                self._on_split_complete,
+                self._on_split_error,
+            )
+        )
+        self.status.setText("Click on the selected edge where it should be split.")
+
+    def _on_split_by_click(self) -> None:
+        self.begin_split_by_click()
+
+    def _on_split_at_coordinates(self) -> None:
+        edge = self._selected_edge_for_split()
+        if edge is None:
+            return
+        midpoint = edge.geometry.evaluate(0.5)
+        x, accepted = QInputDialog.getDouble(
+            self, "Split Edge", "X:", midpoint.x, -999999999, 999999999, 8
+        )
+        if not accepted:
+            return
+        y, accepted = QInputDialog.getDouble(
+            self, "Split Edge", "Y:", midpoint.y, -999999999, 999999999, 8
+        )
+        if not accepted:
+            return
+
+        tolerance = max(1e-8, edge.geometry.length() * 1e-7)
+        try:
+            edges = self.document.split_edge_at_point(
+                edge.id, Point2D(x, y), tolerance=tolerance
+            )
+        except (KeyError, TypeError, ValueError) as error:
+            self._on_split_error(str(error))
+            return
+        self._on_split_complete(edges)
+
+    def _on_split_complete(self, edges) -> None:
+        self.refresh()
+        self.select_edges([edge.id for edge in edges])
+        self.status.setText(
+            "Edge split into edges {} and {}.".format(
+                edges[0].id, edges[1].id
+            )
+        )
+
+    def _on_split_error(self, message) -> None:
+        self.status.setText("Could not split edge: {}".format(message))
 
     @staticmethod
     def _dist_name(dist):

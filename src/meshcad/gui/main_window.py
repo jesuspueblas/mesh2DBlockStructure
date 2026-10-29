@@ -39,6 +39,7 @@ from meshcad.gui.patches_panel import BoundariesPanel
 from meshcad.gui.tools.arc_tool import ArcTool
 from meshcad.gui.tools.line_tool import LineTool
 from meshcad.gui.tools.spline_tool import SplineTool
+from meshcad.gui.tools.split_edge_tool import SplitEdgeTool
 from meshcad.io.cfd_mesh_io import write_cfd_mesh_json
 from meshcad.io.point_sequence import load_point_sequence
 from meshcad.io.project_io import load_project, save_project
@@ -164,6 +165,14 @@ class MainWindow(QMainWindow):
         self.action_spline.triggered.connect(lambda: self.canvas.set_tool(SplineTool(self.canvas)))
         toolbar.addAction(self.action_spline)
 
+        self.action_split_edge = QAction("Split Edge", self)
+        self.action_split_edge.setCheckable(True)
+        self._drawing_tool_actions.addAction(self.action_split_edge)
+        self.action_split_edge.triggered.connect(
+            self.edges_panel.begin_split_by_click
+        )
+        toolbar.addAction(self.action_split_edge)
+
         self.action_insert_point = QAction("Insert Point", self)
         self.action_insert_point.triggered.connect(self._on_insert_point)
         toolbar.addAction(self.action_insert_point)
@@ -244,6 +253,8 @@ class MainWindow(QMainWindow):
             active_action = self.action_arc
         elif isinstance(tool, SplineTool):
             active_action = self.action_spline
+        elif isinstance(tool, SplitEdgeTool):
+            active_action = self.action_split_edge
         active_action.setChecked(True)
 
     # --- toolbar appearance ---
