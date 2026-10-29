@@ -1,14 +1,25 @@
 """Interactive CAD canvas based on QGraphicsView."""
 
 from __future__ import annotations
+
 import math
+
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal
 from PyQt5.QtGui import QBrush, QColor, QPainter, QPainterPath, QPen
 from PyQt5.QtWidgets import (
-    QGraphicsEllipseItem, QGraphicsPathItem, QGraphicsScene, QGraphicsView,
-    QDialog, QVBoxLayout, QFormLayout, QDoubleSpinBox, QDialogButtonBox
+    QDialog,
+    QDialogButtonBox,
+    QDoubleSpinBox,
+    QFormLayout,
+    QGraphicsEllipseItem,
+    QGraphicsPathItem,
+    QGraphicsScene,
+    QGraphicsView,
+    QVBoxLayout,
 )
+
 from meshcad.core.geometry.point import Point2D
+from meshcad.core.topology.vertex import Vertex
 from meshcad.gui.document import Document
 from meshcad.gui.items import GeometryItem
 
@@ -35,6 +46,9 @@ class CadCanvas(QGraphicsView):
 
         self.tool = None
         self._drag_target = None
+        self._drag_start_pos = None
+        self._vertex_drag_moved = False
+        self._snap_target_id = None
         self._is_panning = False
         self._last_mouse_pos = None
 
@@ -123,13 +137,54 @@ class CadCanvas(QGraphicsView):
                 best_dist = d
         if best is None:
             return None
-        scale = self.transform().m11()
+        scale = abs(self.transform().m11())
         if scale <= 0:
             return best
         tol_scene = SNAP_TOLERANCE / scale
         if best_dist is not None and best_dist <= tol_scene:
             return best
         return None
+
+    def _vertex_drag_snap_target(
+        self, vertex_id: int, point: Point2D
+    ) -> Vertex | None:
+        scale = abs(self.transform().m11())
+        if scale <= 0:
+            return None
+
+        connected_vertex_ids = set()
+        for edge in self.document.topology.edges():
+            if edge.start_vertex_id == vertex_id:
+                connected_vertex_ids.add(edge.end_vertex_id)
+            elif edge.end_vertex_id == vertex_id:
+                connected_vertex_ids.add(edge.start_vertex_id)
+
+        tolerance = SNAP_TOLERANCE / scale
+        candidates = [
+            vertex for vertex in self.document.topology.vertices()
+            if vertex.id != vertex_id
+            and vertex.id not in connected_vertex_ids
+            and vertex.point.distance_to(point) <= tolerance
+        ]
+        return min(
+            candidates,
+            key=lambda vertex: vertex.point.distance_to(point),
+            default=None,
+        )
+
+    def _set_snap_target(self, vertex_id: int | None) -> None:
+        default_pen = QPen(QColor(200, 40, 40))
+        default_brush = QBrush(QColor(255, 220, 220))
+        previous = self._vertex_items.get(self._snap_target_id)
+        if previous is not None:
+            previous.setPen(default_pen)
+            previous.setBrush(default_brush)
+
+        self._snap_target_id = vertex_id
+        target = self._vertex_items.get(vertex_id)
+        if target is not None:
+            target.setPen(QPen(QColor(20, 150, 70), 2.0))
+            target.setBrush(QBrush(QColor(180, 255, 200)))
 
     def show_preview(self, geometry) -> None:
         self.clear_preview()
@@ -310,6 +365,8 @@ class CadCanvas(QGraphicsView):
             v = self.snap_to_vertex(p)
             if v is not None:
                 self._drag_target = ('vertex', v.id)
+                self._drag_start_pos = p
+                self._vertex_drag_moved = False
                 event.accept()
                 return
 
@@ -417,10 +474,24 @@ class CadCanvas(QGraphicsView):
         if self._drag_target:
             p = Point2D(pos.x(), pos.y())
             if self._drag_target[0] == 'vertex':
-                self.document.topology.move_vertex(self._drag_target[1], p)
+                source_id = self._drag_target[1]
+                if (
+                    self._drag_start_pos is not None
+                    and p.distance_to(self._drag_start_pos) > 1e-12
+                ):
+                    self._vertex_drag_moved = True
+                snap_target = self._vertex_drag_snap_target(source_id, p)
+                self.document.topology.move_vertex(
+                    source_id, snap_target.point if snap_target is not None else p
+                )
+                self._snap_target_id = (
+                    snap_target.id if snap_target is not None else None
+                )
             else:
                 self.document.topology.move_edge_grip(self._drag_target[1], self._drag_target[2], p)
             self.document.notify_change()
+            if self._drag_target[0] == 'vertex':
+                self._set_snap_target(self._snap_target_id)
             event.accept()
             return
 
@@ -436,7 +507,20 @@ class CadCanvas(QGraphicsView):
             return
 
         if self._drag_target:
+            if self._drag_target[0] == 'vertex':
+                scene_pos = self.mapToScene(event.pos())
+                point = Point2D(scene_pos.x(), scene_pos.y())
+                source_id = self._drag_target[1]
+                snap_target = self._vertex_drag_snap_target(source_id, point)
+                if snap_target is not None and self._vertex_drag_moved:
+                    self.document.topology.merge_vertices(source_id, snap_target.id)
+                else:
+                    self.document.topology.move_vertex(source_id, point)
+                self.document.notify_change()
+                self._set_snap_target(None)
             self._drag_target = None
+            self._drag_start_pos = None
+            self._vertex_drag_moved = False
             event.accept()
             return
         super().mouseReleaseEvent(event)
@@ -516,3 +600,4 @@ class CadCanvas(QGraphicsView):
                 item.setZValue(9.0)
                 self.scene().addItem(item)
                 self._grip_items.append(item)
+        self._set_snap_target(self._snap_target_id)

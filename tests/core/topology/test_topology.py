@@ -1,3 +1,5 @@
+import math
+
 import pytest
 
 from meshcad.core.geometry.line import Line
@@ -72,6 +74,54 @@ def test_add_edge_foreign_vertex_rejected():
         t1.add_edge(v0, v1, Line(v0.point, v1.point))
 
 
+def test_merge_vertices_retargets_incident_edges_and_geometry():
+    topology = Topology()
+    source = topology.add_vertex(Point2D(0, 0))
+    target = topology.add_vertex(Point2D(2, 0))
+    other = topology.add_vertex(Point2D(0, 2))
+    edge = topology.add_edge(source, other, Line(source.point, other.point))
+
+    topology.merge_vertices(source.id, target.id)
+
+    merged_edge = topology.get_edge(edge.id)
+    assert merged_edge.start_vertex_id == target.id
+    assert merged_edge.geometry.start_point() == target.point
+    assert not topology.has_vertex(source.id)
+
+
+def test_merge_arc_endpoint_reconnects_geometry():
+    from meshcad.core.geometry.arc import Arc
+
+    topology = Topology()
+    source = topology.add_vertex(Point2D(1, 0))
+    end = topology.add_vertex(Point2D(0, 1))
+    target = topology.add_vertex(Point2D(2, 0))
+    edge = topology.add_edge(
+        source, end, Arc(Point2D(0, 0), 1.0, 0.0, math.pi / 2)
+    )
+
+    topology.merge_vertices(source.id, target.id)
+
+    merged_edge = topology.get_edge(edge.id)
+    assert merged_edge.start_vertex_id == target.id
+    assert merged_edge.geometry.start_point().distance_to(target.point) < 1e-7
+
+
+def test_merge_vertices_rejects_edge_collapse_without_mutation():
+    topology = Topology()
+    source = topology.add_vertex(Point2D(0, 0))
+    target = topology.add_vertex(Point2D(1, 0))
+    edge = topology.add_edge(source, target, Line(source.point, target.point))
+
+    with pytest.raises(ValueError, match="collapse an edge"):
+        topology.merge_vertices(source.id, target.id)
+
+    assert topology.has_vertex(source.id)
+    assert topology.has_vertex(target.id)
+    assert topology.get_edge(edge.id).start_vertex_id == source.id
+    assert topology.get_edge(edge.id).end_vertex_id == target.id
+
+
 def test_edges_unique_ids():
     t = Topology()
     v0 = t.add_vertex(Point2D(0, 0))
@@ -123,8 +173,9 @@ def test_split_edge_preserves_line_geometry_and_original_id():
 
 
 def test_split_edge_preserves_arc_shape():
-    from meshcad.core.geometry.arc import Arc
     import math
+
+    from meshcad.core.geometry.arc import Arc
 
     topology = Topology()
     geometry = Arc(Point2D(0, 0), 2, 0, math.pi)

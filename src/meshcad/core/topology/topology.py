@@ -10,8 +10,8 @@ from meshcad.core.geometry.entity import GeometryEntity
 from meshcad.core.geometry.line import Line
 from meshcad.core.geometry.point import Point2D
 from meshcad.core.geometry.spline import Spline, SplineSegment
-from meshcad.core.topology.edge import Edge, OrientedEdge
 from meshcad.core.topology.block_side import BlockSide
+from meshcad.core.topology.edge import Edge, OrientedEdge
 from meshcad.core.topology.vertex import Vertex
 
 TOL = 1e-7
@@ -252,6 +252,36 @@ class Topology:
                     new_g = g
 
                 self._edges[eid] = Edge(eid, edge.start_vertex_id, edge.end_vertex_id, new_g)
+
+    def merge_vertices(self, source_id: int, target_id: int) -> None:
+        """Merge source_id into target_id, preserving all incident edge geometry."""
+        if source_id not in self._vertices or target_id not in self._vertices:
+            raise ValueError("Both vertices must belong to this topology.")
+        if source_id == target_id:
+            raise ValueError("A vertex cannot be merged into itself.")
+
+        incident_edges = [
+            edge for edge in self._edges.values()
+            if edge.start_vertex_id == source_id or edge.end_vertex_id == source_id
+        ]
+        if any(
+            edge.start_vertex_id == target_id or edge.end_vertex_id == target_id
+            for edge in incident_edges
+        ):
+            raise ValueError("Merging these vertices would collapse an edge.")
+
+        target_point = self._vertices[target_id].point
+        self.move_vertex(source_id, target_point)
+
+        for original_edge in incident_edges:
+            edge = self._edges[original_edge.id]
+            self._edges[edge.id] = Edge(
+                edge.id,
+                target_id if edge.start_vertex_id == source_id else edge.start_vertex_id,
+                target_id if edge.end_vertex_id == source_id else edge.end_vertex_id,
+                edge.geometry,
+            )
+        del self._vertices[source_id]
 
     def move_edge_grip(self, edge_id: int, grip_index: int, new_point: Point2D) -> None:
         edge = self._edges.get(edge_id)

@@ -101,6 +101,7 @@ A side may contain several edges. Shared vertices between consecutive edges are 
 ## Geometry Editing
 
 - Topological vertices are edited by dragging or by entering exact coordinates.
+- Dragging a vertex near another unconnected vertex highlights the target and merges the vertices on release.
 - Arc centers and internal spline points are represented as grips.
 - Arc endpoint edits recompute radius and angles while preserving connectivity.
 - Arc-center edits keep endpoints fixed and project the requested center onto the chord perpendicular bisector.

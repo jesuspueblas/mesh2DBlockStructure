@@ -84,6 +84,7 @@ to other geometry.
 Switch to **Select** before editing.
 
 - Drag a red vertex to move every connected edge.
+- Release a dragged vertex near another unconnected vertex to merge the endpoints; the snap target is highlighted in green while dragging. A merge that would collapse an existing edge is prevented.
 - Drag a blue grip to move an arc center or an internal spline control point.
 - Double-click a vertex or grip to enter exact coordinates.
 - When an arc center is edited, its endpoints remain fixed and the center is constrained to the chord perpendicular bisector.
@@ -97,7 +98,7 @@ If no loop is detected:
 
 1. zoom into every connection;
 2. check for gaps or duplicate endpoints;
-3. use snapping or double-click coordinate editing to make endpoints coincide;
+3. drag one endpoint onto the other to merge them, or use double-click coordinate editing to make their coordinates coincide;
 4. run **Detect Loops** again.
 
 ### 4. Create a Structured Block
