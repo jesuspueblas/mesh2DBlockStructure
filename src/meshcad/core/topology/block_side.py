@@ -10,14 +10,13 @@ from meshcad.core.topology.edge import OrientedEdge
 
 @dataclass
 class BlockSide:
-    """Un lado de un bloque estructurado.
+    """One side of a structured block.
 
-    El lado es a secuencia de OrientedEdge que se recorre de start
-    a fin. Varias edges pueden componer un same lado.
+    A side is a sequence of OrientedEdge objects traversed from start to
+    end. Multiple edges can form one side.
 
-    node_count es el number de nodes que tendra la mesh a lo largo de
-    este lado. De momento vale 0 (without asignar) to la fase de
-    distribuciones.
+    node_count is the number of mesh nodes along this side. It remains 0
+    until distributions are assigned.
     """
 
     oriented_edges: Tuple[OrientedEdge, ...]

@@ -35,7 +35,7 @@ class Spline(GeometryEntity):
 
     def __post_init__(self):
         if len(self.points) < 2:
-            raise ValueError("Una spline requires at least two points")
+            raise ValueError("A spline requires at least two points")
 
     def start_point(self) -> Point2D:
         return self.points[0]

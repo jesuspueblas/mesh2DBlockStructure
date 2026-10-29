@@ -1,8 +1,8 @@
-"""Prueba que dos loops pueden compartir exactamente la misma edge.
+"""Verify that two loops can share the same edge.
 
-Esta es la propiedad fundamental for el mallador: si dos blocks
-comparten a edge, esa edge es un single objeto Edge y por tanto
-tendra a single distribucion de nodes.
+This is a fundamental property of the mesher: if two blocks share an edge,
+that edge is represented by a single Edge object and therefore has a single
+node distribution.
 """
 
 from meshcad.core.geometry.line import Line
@@ -12,16 +12,16 @@ from meshcad.core.topology.topology import Topology
 
 
 def build_two_squares():
-    """Dos cuadrados que comparten la edge vertical central.
+    """Build two squares that share the central vertical edge.
 
-    Topologia (vertices):
+    Topology (vertices):
         v2(0,1) --- v3(1,1) --- v4(2,1)
         |           |           |
         v0(0,0) --- v1(1,0) --- v5(2,0)
 
-    Cuadrado izquierdo: v0 -> v1 -> v3 -> v2 -> v0
-    Cuadrado derecho:   v1 -> v5 -> v4 -> v3 -> v1
-    Arista shared:  v1 -> v3
+    Left square:  v0 -> v1 -> v3 -> v2 -> v0
+    Right square: v1 -> v5 -> v4 -> v3 -> v1
+    Shared edge:  v1 -> v3
     """
     t = Topology()
     v0 = t.add_vertex(Point2D(0, 0))
@@ -46,10 +46,10 @@ def build_two_squares():
     left.add_edge(e_left.id, reversed=True)      # v2 -> v0
 
     right = Loop()
-    right.add_edge(e_shared.id, reversed=True)   # v1 -> v3 invertida: v3 -> v1
-    # En realidad queremos v1 -> v5 -> v4 -> v3 -> v1, veamos:
-    # e_shared va de v1 a v3; la necesitamos en sentido v3 -> v1 -> reversed
-    # Reconstruimos right from v1:
+    right.add_edge(e_shared.id, reversed=True)   # v1 -> v3 reversed: v3 -> v1
+    # The intended path is v1 -> v5 -> v4 -> v3 -> v1.
+    # e_shared runs from v1 to v3, so it must be reversed to go from v3 to v1.
+    # Rebuild the right loop starting at v1:
     right = Loop()
     right.add_edge(e_bottom_right.id)            # v1 -> v5
     right.add_edge(e_right.id)                   # v5 -> v4
@@ -73,12 +73,12 @@ def test_right_square_is_closed():
 
 def test_shared_edge_is_the_same_object():
     t, left, right, e_shared = build_two_squares()
-    # La edge shared aparece en ambos loops with el same id.
+    # The shared edge appears in both loops with the same ID.
     left_ids = [oe.edge_id for oe in left]
     right_ids = [oe.edge_id for oe in right]
     assert e_shared.id in left_ids
     assert e_shared.id in right_ids
-    # Y es literalmente el same objeto en la topology.
+    # It is literally the same object in the topology.
     assert t.get_edge(e_shared.id) is e_shared
 
 

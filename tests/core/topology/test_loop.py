@@ -82,8 +82,8 @@ def test_triangle_all_reversed_is_closed():
 
 
 def test_mixed_orientation_closed():
-    # Construimos un triangulo with e1 definido en opposite direction
-    # (v2 -> v1) for probar que reversed=True arregla la orientacion.
+    # Build a triangle with e1 defined in the opposite direction.
+    # (v2 -> v1) to verify that reversed=True corrects the orientation.
     t = Topology()
     v0 = t.add_vertex(Point2D(0, 0))
     v1 = t.add_vertex(Point2D(1, 0))

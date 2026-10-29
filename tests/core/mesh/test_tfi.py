@@ -7,7 +7,7 @@ from meshcad.core.mesh.tfi import tfi_grid
 
 
 def make_rect_sides(n_u=3, n_v=4):
-    # Rectangulo [0, 1] x [0, 2]
+    # Rectangle [0, 1] x [0, 2].
     c0 = Point2D(0, 0)
     c1 = Point2D(1, 0)
     c2 = Point2D(1, 2)
@@ -42,29 +42,29 @@ def test_grid_boundaries_match_sides():
     n_u = len(s)
     n_v = len(e)
 
-    # Sur: fila 0 == south
+    # South: row 0 == south.
     for i in range(n_u):
         assert math.isclose(grid[0][i].x, s[i].x)
         assert math.isclose(grid[0][i].y, s[i].y)
 
-    # Este: columna n_u-1 == east
+    # East: column n_u-1 == east.
     for j in range(n_v):
         assert math.isclose(grid[j][n_u - 1].x, e[j].x)
         assert math.isclose(grid[j][n_u - 1].y, e[j].y)
 
-    # Norte: fila n_v-1 == north reversed
+    # North: row n_v-1 == reversed north.
     for i in range(n_u):
         assert math.isclose(grid[n_v - 1][i].x, n[n_u - 1 - i].x)
         assert math.isclose(grid[n_v - 1][i].y, n[n_u - 1 - i].y)
 
-    # Oeste: columna 0 == west reversed
+    # West: column 0 == reversed west.
     for j in range(n_v):
         assert math.isclose(grid[j][0].x, w[n_v - 1 - j].x)
         assert math.isclose(grid[j][0].y, w[n_v - 1 - j].y)
 
 
 def test_rectangle_interior_is_cartesian():
-    # En un rectangle with distribucion uniform, la mesh must ser cartesiana.
+    # With uniform distribution, a rectangular mesh must be Cartesian.
     s, e, n, w = make_rect_sides(4, 5)
     grid = tfi_grid(s, e, n, w)
     for j in range(len(grid)):
@@ -78,7 +78,7 @@ def test_rectangle_interior_is_cartesian():
 def test_requires_matching_counts():
     s = [Point2D(0, 0), Point2D(1, 0), Point2D(2, 0)]
     e = [Point2D(2, 0), Point2D(2, 1)]
-    n_wrong = [Point2D(2, 1), Point2D(0, 1)]  # only 2 puntos en vez de 3
+    n_wrong = [Point2D(2, 1), Point2D(0, 1)]  # Only 2 points instead of 3.
     w = [Point2D(0, 1), Point2D(0, 0)]
     with pytest.raises(ValueError):
         tfi_grid(s, e, n_wrong, w)

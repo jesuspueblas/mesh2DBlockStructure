@@ -9,10 +9,9 @@ from meshcad.gui.tools.base import BaseTool
 
 
 class SplineTool(BaseTool):
-    """N clics for anadir puntos. Clic derecho for terminar.
+    """Use left-clicks to add points and right-click to finish.
 
-    Muestra la spline en tiempo real a medida que se anaden puntos y
-    se mueve el raton.
+    Show the spline in real time as points are added and the pointer moves.
     """
 
     def mouse_press(self, event) -> None:

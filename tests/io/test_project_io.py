@@ -1,4 +1,4 @@
-"""La capa io only trata with dicts; no importa Qt."""
+"""The IO layer only handles dictionaries; it does not import Qt."""
 
 import sys
 

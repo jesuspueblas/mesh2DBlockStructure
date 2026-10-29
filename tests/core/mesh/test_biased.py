@@ -37,7 +37,7 @@ def test_strictly_increasing():
 
 
 def test_bias_gt_one_clusters_at_start():
-    # Con bias > 1 los primeros intervalos son menores
+    # With bias > 1, the first intervals are smaller.
     d = BiasedDistribution(bias=2.0, from_start=True)
     ts = d.positions(6)
     first_interval = ts[1] - ts[0]

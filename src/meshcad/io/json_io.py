@@ -143,7 +143,7 @@ def topology_from_dict(data: Dict[str, Any]) -> Topology:
     return t
 
 
-# --------------------------- mesh por edge -------------------------- #
+# --------------------------- per-edge mesh ------------------------- #
 
 
 def edge_spec_to_dict(spec: EdgeMeshSpec) -> Dict[str, Any]:

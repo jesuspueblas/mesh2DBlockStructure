@@ -18,10 +18,10 @@ DEFAULT_N_NODES = 5
 
 @dataclass
 class EdgeMeshSpec:
-    """Especificacion de mesh de a edge.
+    """Mesh specification for an edge.
 
-    n_nodes es el number total de nodes, incluyendo ambos extremos.
-    distribution define como se reparten en el parametro t en [0, 1].
+    n_nodes is the total number of nodes, including both endpoints.
+    distribution defines their positions along parameter t in [0, 1].
     """
 
     edge_id: int
@@ -34,16 +34,16 @@ class EdgeMeshSpec:
 
 
 class MeshModel:
-    """Distributions de nodes asociadas a las edges.
+    """Node distributions associated with edges.
 
-    Una misma edge can pertenecer a varios blocks; la distribucion
-    se guarda a sola vez y all los blocks la comparten.
+    The same edge can belong to multiple blocks; its distribution is stored
+    once and shared by all of them.
     """
 
     def __init__(self) -> None:
         self.edge_specs: Dict[int, EdgeMeshSpec] = {}
 
-    # ----------------------------- acceso ------------------------------- #
+    # ----------------------------- access -------------------------------- #
 
     def get_spec(self, edge_id: int) -> EdgeMeshSpec:
         spec = self.edge_specs.get(edge_id)
@@ -57,14 +57,13 @@ class MeshModel:
     def clear_spec(self, edge_id: int) -> None:
         self.edge_specs.pop(edge_id, None)
 
-    # ----------------------------- consultas ---------------------------- #
+    # ----------------------------- queries ------------------------------ #
 
     def side_node_count(self, side: BlockSide) -> int:
-        """Number of nodes de un lado concatenando sus edges.
+        """Return the number of nodes on a side by concatenating its edges.
 
-        Si el lado tiene k edges with n_0, ..., n_{k-1} nodes cada a,
-        el total es sum(n_i) - (k - 1), porque los extremos de edges
-        consecutivas se solapan en un vertex.
+        If the side has k edges with n_0, ..., n_{k-1} nodes each, the total
+        is sum(n_i) - (k - 1), because consecutive edges share an endpoint.
         """
         if not side.oriented_edges:
             return 0

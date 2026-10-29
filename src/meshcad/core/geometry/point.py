@@ -9,7 +9,7 @@ from typing import Tuple
 
 @dataclass(frozen=True)
 class Point2D:
-    """Punto en el plano 2D, inmutable."""
+    """Immutable point in the 2D plane."""
 
     x: float
     y: float

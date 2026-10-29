@@ -13,7 +13,7 @@ from meshcad.core.topology.topology import Topology
 
 
 def build_square_block(n_nodes=4):
-    """Cuadrado [0,1]x[0,1] with 4 edges y un bloque."""
+    """Square [0, 1] x [0, 1] with four edges and one block."""
     t = Topology()
     v0 = t.add_vertex(Point2D(0, 0))
     v1 = t.add_vertex(Point2D(1, 0))
@@ -66,7 +66,7 @@ def test_mesh_block_rectangle_uniform():
 def test_mesh_block_requires_matching_opposite_sides():
     t, block, model, _, (e0, e1, e2, e3) = build_square_block(n_nodes=4)
     model.set_spec(EdgeMeshSpec(e0.id, 4, UniformDistribution()))
-    model.set_spec(EdgeMeshSpec(e2.id, 6, UniformDistribution()))  # desajuste
+    model.set_spec(EdgeMeshSpec(e2.id, 6, UniformDistribution()))  # Mismatch.
     with pytest.raises(ValueError):
         mesh_block(block, t, model)
 
@@ -83,14 +83,14 @@ def test_mesh_block_with_different_counts_per_direction():
 
 
 def test_adjacent_blocks_are_conformal():
-    """Dos cuadrados que comparten edge deben dar la misma linea de nodes."""
+    """Two squares sharing an edge must produce the same line of nodes."""
     t = Topology()
-    # Cuadrado izquierdo
+    # Left square.
     v0 = t.add_vertex(Point2D(0, 0))
     v1 = t.add_vertex(Point2D(1, 0))
     v2 = t.add_vertex(Point2D(1, 1))
     v3 = t.add_vertex(Point2D(0, 1))
-    # Cuadrado derecho
+    # Right square.
     v4 = t.add_vertex(Point2D(2, 0))
     v5 = t.add_vertex(Point2D(2, 1))
 
@@ -128,18 +128,18 @@ def test_adjacent_blocks_are_conformal():
     bm_left = mesh_block(block_left, t, model)
     bm_right = mesh_block(block_right, t, model)
 
-    # El lado este del bloque izquierdo es la columna n_u-1
+    # The left block's east side is column n_u-1.
     left_edge_points = [
         (round(bm_left.point(bm_left.n_u - 1, j).x, 9),
          round(bm_left.point(bm_left.n_u - 1, j).y, 9))
         for j in range(bm_left.n_v)
     ]
-    # El lado oeste del bloque derecho es la columna 0
+    # The right block's west side is column 0.
     right_edge_points = [
         (round(bm_right.point(0, j).x, 9),
          round(bm_right.point(0, j).y, 9))
         for j in range(bm_right.n_v)
     ]
 
-    # Los conjuntos de puntos deben coincidir (aunque el orden se invierta)
+    # The point sets must match, even if their order is reversed.
     assert set(left_edge_points) == set(right_edge_points)

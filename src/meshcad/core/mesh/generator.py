@@ -15,11 +15,11 @@ from meshcad.core.topology.topology import Topology
 
 @dataclass
 class BlockMesh:
-    """Malla estructurada de un bloque.
+    """Structured mesh for a block.
 
-    grid[j][i] with j en [0, n_v) e i en [0, n_u).
-    n_u es el number de nodes de los lados 0 y 2.
-    n_v es el number de nodes de los lados 1 y 3.
+    grid[j][i] with j in [0, n_v) and i in [0, n_u).
+    n_u is the number of nodes on sides 0 and 2.
+    n_v is the number of nodes on sides 1 and 3.
     """
 
     block_id: int
@@ -43,7 +43,7 @@ class BlockMesh:
 
 
 def mesh_block(block: Block, topology: Topology, mesh_model: MeshModel, options: Optional[SmoothingOptions] = None) -> BlockMesh:
-    """Genera la mesh de un bloque usando sus 4 lados y el modelo de mesh."""
+    """Generate a block mesh from its four sides and the mesh model."""
     side_samples = [
         mesh_model.side_samples(side, topology) for side in block.sides
     ]

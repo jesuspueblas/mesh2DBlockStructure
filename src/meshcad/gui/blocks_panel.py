@@ -45,11 +45,11 @@ class BlocksPanel(QDockWidget):
                 tag = "MISMATCH"
                 n_bad += 1
                 msgs = []
-                if not ok_02: msgs.append("lados 0/2: {} vs {}".format(n0, n2))
-                if not ok_13: msgs.append("lados 1/3: {} vs {}".format(n1, n3))
+                if not ok_02: msgs.append("sides 0/2: {} vs {}".format(n0, n2))
+                if not ok_13: msgs.append("sides 1/3: {} vs {}".format(n1, n3))
                 detail = "; ".join(msgs)
 
-            item = QListWidgetItem("Bloque {}: {} {}".format(block.id, tag, detail))
+            item = QListWidgetItem("Block {}: {} {}".format(block.id, tag, detail))
             self.list_widget.addItem(item)
 
         if not self.document.blocks:

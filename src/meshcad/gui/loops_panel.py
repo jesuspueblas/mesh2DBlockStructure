@@ -74,4 +74,4 @@ class LoopsPanel(QDockWidget):
             self.status.setText("Error: {}".format(e))
             return
         self.document.add_block(block)
-        self.status.setText("Bloque {} created.".format(block.id))
+        self.status.setText("Block {} created.".format(block.id))

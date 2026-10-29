@@ -9,12 +9,12 @@ from meshcad.core.geometry.entity import GeometryEntity
 
 @dataclass(frozen=True)
 class Edge:
-    """Arista topologica entre dos vertices.
+    """Topological edge between two vertices.
 
-    La geometry subyacente (Line, Arc, Spline) define la forma de la
-    edge y va siempre en el sentido start_vertex -> end_vertex.
-    Si un loop la recorre en opposite direction, no se duplica la edge:
-    se usa OrientedEdge with reversed=True.
+    The underlying geometry (Line, Arc, Spline) defines the edge shape and
+    always runs from start_vertex to end_vertex. If a loop traverses it in
+    the opposite direction, the edge is not duplicated; an OrientedEdge
+    with reversed=True is used instead.
     """
 
     id: int
@@ -30,11 +30,11 @@ class Edge:
 
 @dataclass(frozen=True)
 class OrientedEdge:
-    """Usage concreto de a edge inside de un loop.
+    """A specific use of an edge within a loop.
 
-    reversed=False: el loop recorre la edge en su sentido natural
+    reversed=False: the loop traverses the edge in its natural direction
                     (start_vertex -> end_vertex).
-    reversed=True:  el loop la recorre in reverse.
+    reversed=True:  the loop traverses the edge in reverse.
     """
 
     edge_id: int

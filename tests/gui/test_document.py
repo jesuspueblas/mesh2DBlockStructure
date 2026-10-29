@@ -76,7 +76,7 @@ def test_generate_mesh_reports_mismatch(qtbot):
     sides = loop.split_at_corners(t, [v0.id, v1.id, v2.id, v3.id])
     doc.add_block(Block(doc.next_block_id(), sides))
 
-    # Desajuste lados 0/2 (inyectado directamente for saltar la propagacion)
+    # Mismatch on sides 0/2 (set directly to bypass propagation).
     doc.mesh.set_spec(EdgeMeshSpec(e0.id, 4, UniformDistribution()))
     doc.mesh.set_spec(EdgeMeshSpec(e2.id, 6, UniformDistribution()))
     doc.mesh.set_spec(EdgeMeshSpec(e1.id, 4, UniformDistribution()))
@@ -86,7 +86,7 @@ def test_generate_mesh_reports_mismatch(qtbot):
     meshes, errors = doc.generate_mesh()
     assert meshes == []
     assert len(errors) == 1
-    assert "Bloque 0" in errors[0]
+    assert "Block 0" in errors[0]
 
 
 def test_document_patch_model_round_trip_and_version_3(qtbot):

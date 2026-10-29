@@ -1,4 +1,4 @@
-"""Smoke test: el paquete se importa y expone a version."""
+"""Smoke test: the package imports and exposes a version."""
 
 
 def test_version():

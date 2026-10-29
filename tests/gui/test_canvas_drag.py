@@ -51,7 +51,7 @@ def test_auto_mesh_regen(qtbot):
     assert len(doc.block_meshes) == 1
     old_mesh = doc.block_meshes[0]
 
-    # Mover un vertex deberia regenerar la mesh automaticamente
+    # Moving a vertex should regenerate the mesh automatically.
     doc.topology.move_vertex(v1.id, Point2D(2, 0))
     doc.notify_change()
 

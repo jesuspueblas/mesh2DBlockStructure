@@ -8,18 +8,18 @@ from meshcad.core.geometry.point import Point2D
 
 
 class BaseTool:
-    """Interfaz comun a all las herramientas interactivas.
+    """Common interface for all interactive tools.
 
-    Cada herramienta acumula puntos en self.points. Cuando tiene
-    suficientes, llama a canvas.add_geometry. Mientras tanto muestra
-    a vista previa llamando a canvas.show_preview.
+    Each tool accumulates points in self.points. Once enough points have
+    been collected, it calls canvas.add_geometry. Until then, it displays
+    a preview by calling canvas.show_preview.
     """
 
     def __init__(self, canvas) -> None:
         self.canvas = canvas
         self.points: List[Point2D] = []
 
-    def mouse_press(self, event) -> None:  # pragma: no cover - abstracto
+    def mouse_press(self, event) -> None:  # pragma: no cover - abstract
         raise NotImplementedError
 
     def mouse_move(self, event) -> None:
@@ -29,7 +29,7 @@ class BaseTool:
         self.points = []
         self.canvas.clear_preview()
 
-    # ----------------------- utilidades for subclases ------------------ #
+    # ----------------------- utilities for subclasses ------------------ #
 
     def _scene_point(self, event) -> Point2D:
         pos = self.canvas.mapToScene(event.pos())
@@ -40,5 +40,5 @@ class BaseTool:
         return p
 
     def _refresh_preview(self, event) -> None:
-        """Sobrescrito por cada herramienta."""
+        """Override this method in each tool."""
         return None

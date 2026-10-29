@@ -9,10 +9,10 @@ from meshcad.core.geometry.point import Point2D
 
 @dataclass(frozen=True)
 class Vertex:
-    """Vertice topologico.
+    """Topological vertex.
 
-    El id es asignado por el contenedor Topology. El punto es la
-    representacion geometrica del vertex.
+    The ID is assigned by the Topology container. The point is the vertex's
+    geometric representation.
     """
 
     id: int

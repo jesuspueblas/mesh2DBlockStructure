@@ -9,9 +9,9 @@ from meshcad.gui.tools.base import BaseTool
 
 
 class CornerPickerTool(BaseTool):
-    """Pide al usuario 4 clics sobre vertices del loop activo.
+    """Ask the user to click four vertices on the active loop.
 
-    Al completar los 4, llama a on_complete(lista_ids_vertices).
+    Once all four are selected, call on_complete(vertex_ids).
     """
 
     def __init__(self, canvas, loop, on_complete: Callable[[List[int]], None]) -> None:

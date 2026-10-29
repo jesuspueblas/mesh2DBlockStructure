@@ -23,10 +23,10 @@ def _build_path(geometry: GeometryEntity) -> QPainterPath:
 
 
 class GeometryItem(QGraphicsPathItem):
-    """Item QGraphics que dibuja a entidad geometrica.
+    """QGraphics item that draws a geometric entity.
 
-    En modo preview la pluma es discontinua y clara, no es seleccionable
-    y tiene un z-value menor for que quede por debajo de la geometry real.
+    In preview mode, the pen is light and dashed, the item is not selectable,
+    and its lower z-value places it behind the actual geometry.
     """
 
     def __init__(self, geometry: GeometryEntity, preview: bool = False, parent=None) -> None:

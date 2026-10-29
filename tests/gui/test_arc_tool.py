@@ -67,9 +67,9 @@ def test_arc_tool_preview_circle_after_first_click():
 def test_arc_tool_preview_arc_after_second_click():
     canvas = make_canvas()
     tool = ArcTool(canvas)
-    tool.mouse_press(FakeMouseEvent(0, 0))  # centro
-    tool.mouse_press(FakeMouseEvent(1, 0))  # inicio
-    tool.mouse_move(FakeMouseEvent(0, 1))   # fin candidato
+    tool.mouse_press(FakeMouseEvent(0, 0))  # Center.
+    tool.mouse_press(FakeMouseEvent(1, 0))  # Start.
+    tool.mouse_move(FakeMouseEvent(0, 1))   # Candidate endpoint.
     preview = canvas.previews[-1]
     assert isinstance(preview, Arc)
     assert math.isclose(preview.radius, 1.0)

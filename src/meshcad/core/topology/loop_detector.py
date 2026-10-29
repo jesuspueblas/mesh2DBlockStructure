@@ -11,7 +11,7 @@ from meshcad.core.topology.topology import Topology
 
 
 def _canonical(edge_ids: Tuple[int, ...]) -> Tuple[int, ...]:
-    """Clave canonica de un ciclo: minima entre all las rotaciones y su inversa."""
+    """Return a cycle's canonical key: the minimum rotation or its reverse."""
     n = len(edge_ids)
     forms = []
     for i in range(n):
@@ -23,10 +23,10 @@ def _canonical(edge_ids: Tuple[int, ...]) -> Tuple[int, ...]:
 
 
 def find_loops(topology: Topology, max_loops: int = 50) -> List[Loop]:
-    """Encuentra loops simples (ciclos without vertices repetidos salvo el inicio).
+    """Find simple loops (cycles without repeated vertices except the start).
 
-    Devuelve a lista de Loop with los OrientedEdge ya orientados segun
-    el recorrido encontrado.
+    Return a list of Loops with OrientedEdges oriented along the discovered
+    traversal.
     """
     adj = defaultdict(list)
     for e in topology.edges():

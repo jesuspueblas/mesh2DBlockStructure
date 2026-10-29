@@ -1,8 +1,8 @@
 """Mesh export to VTK XML (PVD plus one VTS file per block).
 
-El formato pvd (ParaView Data) es a coleccion que referencia
-ficheros .vts (VTK XML StructuredGrid), uno por bloque. ParaView
-abre el .pvd y muestra all los blocks a la vez.
+The PVD (ParaView Data) format is a collection that references VTS
+(VTK XML StructuredGrid) files, one per block. ParaView opens the PVD
+file and displays all blocks together.
 """
 
 from __future__ import annotations

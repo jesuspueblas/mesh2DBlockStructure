@@ -27,7 +27,7 @@ def test_remove_edge_keeps_shared_vertices():
     t.remove_edge(e0.id)
     assert len(t.edges()) == 1
     
-    # v1 sigue en uso por e1, asi que no must borrarse. v0 si must borrarse.
+    # v1 is still used by e1 and must not be deleted; v0 must be deleted.
     v_ids = [v.id for v in t.vertices()]
     assert v0.id not in v_ids
     assert v1.id in v_ids

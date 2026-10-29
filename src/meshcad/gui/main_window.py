@@ -204,7 +204,7 @@ class MainWindow(QMainWindow):
 
     # --- toolbar appearance ---
     def _cad_icon(self, kind: str) -> QIcon:
-        """Crea iconos CAD nitidos without depender de ficheros externos."""
+        """Create crisp CAD icons without relying on external files."""
         size = 28
         pixmap = QPixmap(size, size)
         pixmap.fill(Qt.transparent)
@@ -264,7 +264,7 @@ class MainWindow(QMainWindow):
         return QIcon(pixmap)
 
     def _decorate_toolbar(self, toolbar: QToolBar) -> None:
-        """Aplica iconos, atajos visuales y ayuda contextual a la barra."""
+        """Apply icons, visual shortcuts, and tooltips to the toolbar."""
         toolbar.setObjectName("main_toolbar")
         toolbar.setMovable(True)
         toolbar.setFloatable(False)
@@ -279,15 +279,15 @@ class MainWindow(QMainWindow):
         )
 
         entries = (
-            (self.action_select, "select", "Select y editar geometry", "Select edges or drag vertices and control points."),
-            (self.action_line, "line", "Dibujar linea", "Create a segment with two clicks: start and end."),
-            (self.action_arc, "arc", "Dibujar arco circular", "Create an arc with three clicks: center, start, and end."),
-            (self.action_spline, "spline", "Dibujar spline", "Add points with left-click and finish with right-click."),
-            (self.action_insert_point, "point", "Insert Point por coordenadas", "Insert a vertex by entering its X and Y coordinates."),
+            (self.action_select, "select", "Select and edit geometry", "Select edges or drag vertices and control points."),
+            (self.action_line, "line", "Draw a line", "Create a segment with two clicks: start and end."),
+            (self.action_arc, "arc", "Draw a circular arc", "Create an arc with three clicks: center, start, and end."),
+            (self.action_spline, "spline", "Draw a spline", "Add points with left-click and finish with right-click."),
+            (self.action_insert_point, "point", "Insert point by coordinates", "Insert a vertex by entering its X and Y coordinates."),
             (self.action_mesh, "mesh", "Generate Mesh", "Generate or update the structured mesh for all blocks."),
-            (self.action_clear_mesh, "clear_mesh", "Ocultar mesh", "Remove the mesh from the canvas without deleting CAD geometry."),
-            (self.action_grid, "grid", "Mostrar u ocultar rejilla", "Show or hide the canvas reference grid."),
-            (self.action_reset_zoom, "zoom", "Encuadrar todo", "Center and fit all geometry in the visible area."),
+            (self.action_clear_mesh, "clear_mesh", "Hide mesh", "Remove the mesh from the canvas without deleting CAD geometry."),
+            (self.action_grid, "grid", "Show or hide grid", "Show or hide the canvas reference grid."),
+            (self.action_reset_zoom, "zoom", "Fit all", "Center and fit all geometry in the visible area."),
         )
         for action, icon_name, status_tip, tool_tip in entries:
             action.setIcon(self._cad_icon(icon_name))
@@ -295,7 +295,7 @@ class MainWindow(QMainWindow):
             action.setStatusTip(status_tip)
 
         self.orthogonal_check.setToolTip(
-            "Fuerza que las lineas interiores sean perpendiculares al contorno."
+            "Make interior lines perpendicular to the boundary."
         )
         self.orthogonal_layers_spin.setToolTip(
             "Number of inner layers affected by orthogonalization."

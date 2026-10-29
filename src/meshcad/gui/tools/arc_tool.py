@@ -11,10 +11,10 @@ EPS = 1e-9
 
 
 class ArcTool(BaseTool):
-    """Tres clics: centro, inicio, fin. Arc CCW with vista previa.
+    """Three clicks: center, start, end. Counterclockwise arc with preview.
 
-    - Con 1 punto (centro) muestra el circulo with radio = distancia al raton.
-    - Con 2 puntos (centro, inicio) muestra el arco to el raton.
+    - With one point (center), show a circle whose radius follows the pointer.
+    - With two points (center, start), show an arc ending at the pointer.
     """
 
     def mouse_press(self, event) -> None:
@@ -46,7 +46,7 @@ class ArcTool(BaseTool):
             if r < EPS:
                 self.canvas.clear_preview()
                 return
-            # Circulo completo como casi-2pi
+            # Approximate a full circle with an angle just under 2*pi.
             self.canvas.show_preview(Arc(center, r, 0.0, 2.0 * math.pi - 1e-6))
             return
 

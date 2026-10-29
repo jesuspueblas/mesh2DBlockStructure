@@ -142,7 +142,7 @@ class Document(QObject):
     def set_edge_spec(self, spec: EdgeMeshSpec) -> None:
         visited = set()
         self._propagate_nodes(spec.edge_id, spec.n_nodes, visited)
-        # Asegurarnos de que la edge original mantiene su distribucion
+        # Ensure the original edge retains its distribution.
         self.mesh.set_spec(spec)
         self.mesh_changed.emit()
         self.patches_changed.emit()
@@ -168,7 +168,7 @@ class Document(QObject):
             try:
                 bm = mesh_block(block, self.topology, self.mesh, self.mesh_improvement)
             except ValueError as e:
-                errors.append("Bloque {}: {}".format(block.id, e))
+                errors.append("Block {}: {}".format(block.id, e))
                 continue
             self.block_meshes.append(bm)
         self.mesh_generated.emit()

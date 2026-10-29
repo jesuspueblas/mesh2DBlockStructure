@@ -1,4 +1,4 @@
-"""Loop cerrado: secuencia de edges orientadas que forman un contorno."""
+"""Closed loop: a sequence of oriented edges forming a contour."""
 
 from __future__ import annotations
 
@@ -10,10 +10,10 @@ from meshcad.core.topology.topology import Topology
 
 
 class Loop:
-    """Contorno cerrado formado por edges orientadas.
+    """Closed contour formed by oriented edges.
 
-    Las edges se referencian por id (no se copian), de modo que varios
-    loops pueden compartir exactamente la misma edge.
+    Edges are referenced by ID rather than copied, so multiple loops can
+    share the same edge.
     """
 
     def __init__(self, oriented_edges: Optional[List[OrientedEdge]] = None) -> None:
@@ -82,7 +82,7 @@ class Loop:
         for oe in self._edges:
             if not topology.has_edge(oe.edge_id):
                 raise ValueError(
-                    "Arista {} does not exist in the topology".format(oe.edge_id)
+                    "Edge {} does not exist in the topology".format(oe.edge_id)
                 )
         if not self.is_closed(topology):
             raise ValueError("The loop is not closed")
@@ -102,10 +102,10 @@ class Loop:
         topology: Topology,
         corner_vertex_ids: Sequence[int],
     ) -> Tuple[BlockSide, BlockSide, BlockSide, BlockSide]:
-        """Divide el loop en 4 lados usando 4 vertices como corners.
+        """Split the loop into four sides using four vertices as corners.
 
-        corner_vertex_ids can venir en cualquier orden: se reordena
-        segun su posicion a lo largo del loop.
+        corner_vertex_ids can be in any order; they are reordered according
+        to their positions along the loop.
         """
         if len(corner_vertex_ids) != 4:
             raise ValueError("Exactly four corners are required")
@@ -127,7 +127,7 @@ class Loop:
                     break
             if idx is None:
                 raise ValueError(
-                    "El vertex {} does not belong to the loop".format(cid)
+                    "Vertex {} does not belong to the loop".format(cid)
                 )
             positions.append((idx, cid))
 

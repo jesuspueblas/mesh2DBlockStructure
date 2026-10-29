@@ -52,7 +52,7 @@ def test_two_adjacent_squares_share_edge():
     t.add_edge(v1, v4, Line(v1.point, v4.point))  # edge shared
 
     loops = find_loops(t)
-    # Must encontrar al menos los dos cuadrados y el rectangle exterior.
+    # It must find at least the two squares and the outer rectangle.
     assert len(loops) >= 2
     for loop in loops:
         assert loop.is_closed(t)

@@ -74,7 +74,7 @@ class Topology:
             
         edge = self._edges.pop(edge_id)
         
-        # Comprobar si los vertices han quedado orphaned (without otras edges)
+        # Remove vertices that are no longer connected to any edge.
         used_vertices = set()
         for e in self._edges.values():
             used_vertices.add(e.start_vertex_id)

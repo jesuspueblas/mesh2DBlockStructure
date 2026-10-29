@@ -1,7 +1,7 @@
-"""Persistencia (JSON) y exportacion (VTK).
+"""JSON persistence and VTK export.
 
-Este paquete NO depende de PyQt5. La conversion dict <-> Document
-vive en la capa de GUI.
+This package does not depend on PyQt5. Conversion between dictionaries
+and Document objects belongs to the GUI layer.
 """
 
 from meshcad.io.json_io import (

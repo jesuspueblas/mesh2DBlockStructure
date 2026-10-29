@@ -55,7 +55,7 @@ class CadCanvas(QGraphicsView):
         self.document.blocks_changed.connect(self.refresh_boundary_overlay)
 
     def _model_bounding_rect(self):
-        """Calcula los limites del modelo completo y de la mesh visible."""
+        """Calculate the bounds of the complete model and visible mesh."""
         from PyQt5.QtCore import QRectF
         bounds = None
 
@@ -78,7 +78,7 @@ class CadCanvas(QGraphicsView):
         return bounds
 
     def reset_zoom(self) -> None:
-        """Encuadra todo el modelo, elimina el pan y conserva Y hacia arriba."""
+        """Fit the entire model, reset panning, and keep Y pointing upward."""
         rect = self._model_bounding_rect()
         self.resetTransform()
         self.scale(1.0, -1.0)
@@ -320,7 +320,7 @@ class CadCanvas(QGraphicsView):
                         event.accept()
                         return
 
-            # Deteccion de clic en edge
+            # Detect clicks on edges.
             items = self.items(event.pos())
             for item in items:
                 if isinstance(item, GeometryItem) and hasattr(item, 'edge_id'):
@@ -334,7 +334,7 @@ class CadCanvas(QGraphicsView):
         super().mousePressEvent(event)
 
     def _grip_near(self, point: Point2D):
-        """Devuelve (edge_id, grip_index, grip) si hay un grip bajo el cursor."""
+        """Return (edge_id, grip_index, grip) if a grip is under the cursor."""
         scale = abs(self.transform().m11())
         tolerance = SNAP_TOLERANCE / scale if scale > 0 else SNAP_TOLERANCE
         best = None
@@ -348,7 +348,7 @@ class CadCanvas(QGraphicsView):
         return best
 
     def _edit_point_dialog(self, title: str, point: Point2D):
-        """Solicita coordenadas X/Y y devuelve Point2D o None al cancelar."""
+        """Request X/Y coordinates and return a Point2D, or None if canceled."""
         dialog = QDialog(self)
         dialog.setWindowTitle(title)
         layout = QVBoxLayout(dialog)
@@ -377,7 +377,7 @@ class CadCanvas(QGraphicsView):
             scene_pos = self.mapToScene(event.pos())
             point = Point2D(scene_pos.x(), scene_pos.y())
 
-            # Los vertices topologicos tienen prioridad si coinciden with un grip.
+            # Topological vertices take priority when they overlap a grip.
             vertex = self.snap_to_vertex(point)
             if vertex is not None:
                 new_point = self._edit_point_dialog("Edit Vertex", vertex.point)

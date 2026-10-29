@@ -8,7 +8,7 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class Vector2D:
-    """Vector en el plano 2D, inmutable."""
+    """Immutable vector in the 2D plane."""
 
     x: float
     y: float

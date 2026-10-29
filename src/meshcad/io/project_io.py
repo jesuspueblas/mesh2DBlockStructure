@@ -1,9 +1,9 @@
 """Save and load projects in JSON format (plain dictionaries).
 
-Este modulo NO depende de la GUI: recibe y devuelve diccionarios.
-La conversion dict <-> Document vive en la capa de GUI, que es la
-single que conoce Qt. Asi `meshcad.io` se can importar without tener
-PyQt5 instalado.
+This module does not depend on the GUI: it accepts and returns dictionaries.
+Conversion between dictionaries and Document objects belongs to the GUI
+layer, which is the only layer that knows about Qt. This allows
+`meshcad.io` to be imported without PyQt5 installed.
 """
 
 from __future__ import annotations

@@ -21,7 +21,7 @@ class Arc(GeometryEntity):
 
     def __post_init__(self):
         if self.radius <= 0:
-            raise ValueError("El radio must be positive")
+            raise ValueError("The radius must be positive")
 
     def angle_span(self) -> float:
         span = self.end_angle - self.start_angle

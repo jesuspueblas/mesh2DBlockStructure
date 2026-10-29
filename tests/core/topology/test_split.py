@@ -9,7 +9,7 @@ from meshcad.core.topology.topology import Topology
 
 
 def make_square():
-    """Cuadrado unitario with vertices v0..v3 y edges e0..e3."""
+    """Unit square with vertices v0..v3 and edges e0..e3."""
     t = Topology()
     v0 = t.add_vertex(Point2D(0, 0))
     v1 = t.add_vertex(Point2D(1, 0))
@@ -59,7 +59,7 @@ def test_split_requires_distinct_corners():
 
 
 def test_split_rejects_nonexistent_vertex_id():
-    # Un ID que no pertenece a la topology del loop must ser rechazado.
+    # An ID outside the loop topology must be rejected.
     t, (v0, _, _, _), _, loop = make_square()
     fake_id = 99999
     with pytest.raises(ValueError):

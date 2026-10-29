@@ -37,4 +37,4 @@ def test_immutable():
         p.x = 10
     except Exception:
         return
-    raise AssertionError("Point2D deberia ser inmutable")
+    raise AssertionError("Point2D should be immutable")

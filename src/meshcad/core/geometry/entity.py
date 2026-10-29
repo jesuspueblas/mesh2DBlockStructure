@@ -9,7 +9,7 @@ from meshcad.core.geometry.point import Point2D
 
 
 class GeometryEntity(ABC):
-    """Interfaz comun a all las entidades geometricas 2D."""
+    """Common interface for all 2D geometric entities."""
 
     @abstractmethod
     def start_point(self) -> Point2D:

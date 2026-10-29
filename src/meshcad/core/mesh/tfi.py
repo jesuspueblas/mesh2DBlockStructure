@@ -13,15 +13,15 @@ def tfi_grid(
     north: Sequence[Point2D],
     west: Sequence[Point2D],
 ) -> List[List[Point2D]]:
-    """Genera a rejilla estructurada por interpolacion transfinita.
+    """Generate a structured grid using transfinite interpolation.
 
-    Convenio de corners y sentidos (siempre segun el recorrido del loop):
-        south: c0 -> c1 (N_u puntos). Es el lado 0 del bloque.
-        east:  c1 -> c2 (N_v puntos). Es el lado 1 del bloque.
-        north: c2 -> c3 (N_u puntos). Es el lado 2 del bloque.
-        west:  c3 -> c0 (N_v puntos). Es el lado 3 del bloque.
+    Corner and direction convention (following the loop traversal):
+        south: c0 -> c1 (N_u points). This is block side 0.
+        east:  c1 -> c2 (N_v points). This is block side 1.
+        north: c2 -> c3 (N_u points). This is block side 2.
+        west:  c3 -> c0 (N_v points). This is block side 3.
 
-    Devuelve grid[j][i] with j en [0, N_v), i en [0, N_u).
+    Return grid[j][i] with j in [0, N_v), i in [0, N_u).
     grid[0][0] = c0, grid[0][N_u-1] = c1,
     grid[N_v-1][N_u-1] = c2, grid[N_v-1][0] = c3.
     """
@@ -43,15 +43,14 @@ def tfi_grid(
     if n_u < 2 or n_v < 2:
         raise ValueError("Each side requires at least two nodes")
 
-    # Esquinas
+    # Corners
     c0 = south[0]
     c1 = south[-1]
     c2 = north[0]
     c3 = north[-1]
 
-    # Reordenamos los lados 2 y 3 for que vayan en el sentido del grid:
-    # north must ir c3 -> c2 (o sea, recorrer el lado 2 in reverse),
-    # west must ir c0 -> c3 (recorrer el lado 3 in reverse).
+    # Reverse sides 2 and 3 to match the grid traversal direction:
+    # north must go from c3 to c2, and west from c0 to c3.
     north_rev = list(reversed(north))
     west_rev = list(reversed(west))
 
@@ -63,11 +62,11 @@ def tfi_grid(
             u = i / (n_u - 1)
 
             s = south[i]
-            n = north_rev[i]  # norte en (u, 1)
-            w = west_rev[j]   # oeste en (0, v)
-            e = east[j]       # este en (1, v)
+            n = north_rev[i]  # north at (u, 1)
+            w = west_rev[j]   # west at (0, v)
+            e = east[j]       # east at (1, v)
 
-            # Correccion bilineal en las corners
+            # Bilinear correction at the corners
             bx = (
                 (1.0 - u) * (1.0 - v) * c0.x
                 + u * (1.0 - v) * c1.x
