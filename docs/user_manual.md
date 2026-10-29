@@ -18,9 +18,13 @@ The main window contains:
 - **Loops panel:** closed-loop detection and block creation.
 - **Distributions panel:** edge selection, node counts, and distribution settings.
 - **Blocks panel:** block dimensions and compatibility status.
+- **Mesh Patches panel:** groups exterior block edges into named boundary patches.
 - **Status bar:** operation messages and current cursor coordinates.
 
 Hold the pointer over a toolbar icon or parameter control to display its tooltip.
+The active drawing tool (Select, Line, Arc, or Spline) stays highlighted in the
+toolbar. Vertex and spline/arc grip markers keep a constant on-screen size as
+you zoom.
 
 ## Canvas Navigation
 
@@ -42,6 +46,9 @@ Choose one of the CAD tools:
 - **Insert Point:** enter exact X and Y coordinates for an isolated vertex.
 
 A dashed preview shows the candidate geometry while the pointer moves. Existing vertices appear as light red circles. New points snap to nearby vertices so that contours can be closed accurately.
+The coordinate readout in the status bar helps place geometry against the
+visible grid. The selected drawing tool remains highlighted until another tool
+is selected; press **Esc** to cancel it and return to **Select**.
 
 ### 2. Edit Geometry
 
@@ -134,60 +141,143 @@ Useful initial values are 2 to 4 layers and a strength from 0.70 to 0.90.
 
 Useful initial values are 20 to 60 iterations and a relaxation factor from 0.30 to 0.50. Boundary nodes remain fixed.
 
-## Tutorial 1: Rectangular Block
+## Complete Tutorials
 
-### Objective
+The tutorials below start from a blank project and use the controls in the
+current application. Drawing clicks are approximate; use the status-bar
+coordinates and grid as a guide. The important requirements are shared snapped
+vertices, closed loops, and matching node counts on opposite sides.
 
-Create a `9 x 6` node Cartesian mesh.
+### Tutorial 1: Rectangular Block from Drawing to Mesh
 
-### Procedure
+**Goal:** Build one rectangular block with 9 nodes horizontally and 6
+vertically (40 cells).
 
-1. Create a new project.
-2. Draw line segments through `(0, 0)`, `(4, 0)`, `(4, 2.5)`, `(0, 2.5)`, and back to `(0, 0)`.
-3. Detect the four-edge loop.
-4. Create a block by selecting the four rectangle corners.
-5. Select the bottom and top edges and apply 9 uniform nodes.
-6. Select the left and right edges and apply 6 uniform nodes.
-7. Confirm that the Blocks panel reports `OK (nodes 9 x 6)`.
-8. Generate the mesh.
+![MeshCAD showing a generated rectangular block with a 9 by 6 node grid and a valid block status.](images/tutorial-1-rectangular-block.png)
 
-The result has `8 x 5 = 40` cells.
+1. Start MeshCAD and choose **File > New** if a project is already open.
+2. Leave **Show Grid** enabled. Adjust **Spacing** if a finer or coarser
+   drawing reference is useful.
+3. Click **Line**. Draw the four rectangle sides by clicking the lower-left,
+   lower-right, upper-right, upper-left, and lower-left points in sequence.
+   Snap the last click to the first vertex so the contour closes. The Line
+   button remains highlighted while drawing.
+4. Click **Select** to leave line-drawing mode. In the **Loops** panel, click
+   **Detect Loops**. Select the detected four-edge loop; it is highlighted
+   green on the canvas.
+5. Click **Create Block from Loop**, then click the four rectangle vertices.
+   They can be selected in any order, but all four must be distinct. The
+   **Blocks** panel should show one block.
+6. In **Distributions**, click **Refresh Edges** if needed. Select the lower
+   and upper edges (use Ctrl-click for multiple edges). Set **Nodes** to `9`,
+   **Distribution** to **Uniform**, then click **Apply to Selected**.
+7. Select the left and right edges. Set **Nodes** to `6`, keep **Uniform**, and
+   click **Apply to Selected**.
+8. Confirm the block status is `OK (nodes 9 x 6)`. If it reports a mismatch,
+   inspect the listed opposite sides and apply matching totals.
+9. Click **Generate Mesh**. The canvas should show a structured grid with
+   `(9 - 1) x (6 - 1) = 40` cells.
+10. Choose **File > Save As** and save the project as a `.json` file.
 
-## Tutorial 2: Curved Two-Block Domain
+### Tutorial 2: Two Conformal Blocks and a Shared Interface
 
-### Objective
+**Goal:** Create two side-by-side rectangular blocks that share one edge and
+have matching interface nodes.
 
-Create two conformal blocks separated by one shared edge.
+![MeshCAD showing two structured blocks joined at a conformal shared interface.](images/tutorial-2-shared-interface.png)
 
-### Procedure
+1. Start a blank project and select **Line**.
+2. Draw the lower outer boundary as two segments: lower-left to the center
+   point, then center to lower-right. The center must be a real vertex where
+   the interface meets the boundary.
+3. Draw the right outer vertical side, the upper boundary as two segments
+   (upper-right to upper-center, then upper-center to upper-left), and the left
+   outer vertical side. Snap endpoints to existing vertices as you close the
+   outline.
+4. Draw the internal vertical interface from the lower-center vertex to the
+   upper-center vertex, snapping to both. The result is a pair of adjacent
+   closed loops. Do not draw a second overlapping copy of this interface.
+5. Select **Select**, then click **Detect Loops**. Select each loop in turn to
+   confirm that it highlights one rectangle.
+6. Select the first loop and click **Create Block from Loop**. Click its four
+   corner vertices. Repeat for the second loop.
+7. In **Distributions**, set all horizontal edges to `9` uniform nodes and all
+   vertical edges—including the shared interface—to `6` uniform nodes. The
+   shared edge has one specification, used by both blocks.
+8. Check the **Blocks** panel. Both blocks should report `OK (nodes 9 x 6)`.
+   Resolve any mismatch before generating.
+9. Click **Generate Mesh**. Verify that both grids meet continuously at the
+   shared edge and have the same number of interface nodes.
+10. Select **Select** and drag an exterior vertex to adjust the geometry.
+    Generated meshes update when the geometry changes; regenerate if needed
+    after changing mesh settings.
+11. Save the project with **File > Save As**.
 
-1. Draw the left and right boundaries with splines.
-2. Close the outer contour with top and bottom lines.
-3. Draw a transverse line between two existing boundary vertices, snapping both endpoints.
-4. Detect the upper and lower loops.
-5. Create one block from each loop.
-6. Assign compatible uniform distributions, for example 15 nodes on the principal edges.
-7. Generate the mesh.
-8. Drag a spline grip and verify that both block meshes update while the shared interface remains coincident.
+### Tutorial 3: Biasing a Boundary and Improving the Mesh
 
-The supplied `test.json` project can be used as a ready-made two-block example.
+**Goal:** Compare a uniform mesh against a graded mesh with boundary
+orthogonalization and smoothing.
 
-## Tutorial 3: Biased Distribution and Improvement
+![MeshCAD showing a curved block mesh with biased spacing, orthogonalization, and smoothing enabled.](images/tutorial-3-mesh-improvement.png)
 
-1. Open the curved example and generate the uniform baseline mesh.
-2. Select an outer edge, choose **Biased**, and set `Bias = 1.5`.
-3. Increase the node count in the direction requiring more resolution.
-4. Enable **Orthogonal** with 3 layers and `Strength = 0.80`.
-5. Set `Smoothing = 40` and `Relaxation = 0.40`.
-6. Compare the result with orthogonality disabled and smoothing set to zero.
+1. Open the project from Tutorial 1 or 2, or create a block and generate its
+   uniform baseline mesh.
+2. In **Distributions**, select one exterior edge. The selected edge is
+   highlighted on the canvas. Set **Distribution** to **Biased**, set **Bias**
+   to `2.0`, and click **Apply to Selected**.
+3. The bias direction follows the edge's start-to-end direction: a bias
+   greater than `1` concentrates nodes near the start. The direction in which
+   an edge was drawn therefore determines which endpoint receives finer
+   spacing.
+4. Keep opposite sides' node totals compatible. Generate the mesh and compare
+   cell spacing with the uniform baseline.
+5. Enable **Orthogonal**. Set **Layers** to `3` and **Strength** to `0.80`.
+   Mesh improvement controls update the generated mesh live when blocks
+   exist.
+6. Set **Smoothing** to `40` iterations and **Relaxation** to `0.40`. Observe
+   how interior lines change while boundary nodes remain fixed.
+7. Compare with orthogonality disabled and smoothing set to `0`. Change one
+   setting at a time so its effect is clear.
+8. Inspect for crossed/inverted cells, abrupt size jumps, irregular interior
+   lines, poor angles near boundaries, and discontinuities across block
+   interfaces. Reduce bias, strength, iterations, or relaxation if the grid
+   becomes distorted.
+9. Save the project after choosing acceptable settings.
 
-Inspect the grid for:
+### Tutorial 4: Boundary Patches and Mesh Export
 
-- crossed or inverted cells;
-- abrupt cell-size transitions;
-- irregular interior lines;
-- poor boundary angles;
-- discontinuities across shared block interfaces.
+**Goal:** Assign exterior edges to a named boundary, save the project, and
+export the mesh for visualization or CFD.
+
+![MeshCAD showing the inlet patch selected and its exterior edge highlighted on the mesh.](images/tutorial-4-boundary-patches.png)
+
+1. Open a project with at least one valid block, configure compatible edge
+   distributions, and click **Generate Mesh**.
+2. In **Mesh Patches**, click **New**, enter a name such as `inlet`, and
+   confirm. Create additional patches for other boundary groups as required.
+3. Select the desired patch. Its assigned edges are automatically selected
+   and highlighted in the model. Selecting another patch replaces the
+   selection; selecting an empty patch clears it.
+4. In **Distributions**, select one or more exterior edges. Use Ctrl-click in
+   the list or Ctrl-click edges on the canvas to add/remove edges from the
+   selection.
+5. Return to **Mesh Patches** and click **Assign selected edges**. Only
+   exterior block edges are accepted. Shared edges between blocks are
+   internal interfaces and cannot be assigned.
+6. Repeat for other patches. An edge can belong to only one patch and cannot
+   be assigned twice. A conflicting assignment is rejected; remove an edge
+   from its current patch before assigning it elsewhere.
+7. Choose **File > Save** to preserve the geometry, mesh settings, blocks, and
+   patches in the project JSON.
+8. For visualization, click **File > Export Mesh (VTK)** and save the `.pvd`
+   file. Open it in ParaView. Keep the `.pvd` file together with the generated
+   `<name>_blocks` folder and its `.vts` files.
+9. For a CFD boundary mesh, click **File > Export Mesh (JSON)** and save a
+   `.json` file. The export contains named boundary patches; shared block
+   interfaces are represented as internal faces with owner and neighbour,
+   not as boundary patches.
+10. If an export is unavailable, confirm that a valid block and generated
+    mesh exist, correct all block mismatches, and try again.
 
 ## Saving Projects
 
