@@ -7,7 +7,7 @@ from PyQt5.QtCore import Qt, QTimer, QSize
 from PyQt5.QtGui import QColor, QIcon, QPainter, QPen, QPixmap
 from PyQt5.QtWidgets import (
     QAction, QApplication, QDoubleSpinBox, QFileDialog, QLabel,
-    QMainWindow, QMessageBox, QStatusBar, QToolBar, QDialog,
+    QActionGroup, QMainWindow, QMessageBox, QStatusBar, QToolBar, QDialog,
     QVBoxLayout, QFormLayout, QDialogButtonBox, QCheckBox, QSpinBox, QStyle
 )
 
@@ -75,6 +75,8 @@ class MainWindow(QMainWindow):
         self._updating_mesh_controls = False
         self._create_menus()
         self._create_toolbar()
+        self.canvas.tool_changed.connect(self._on_canvas_tool_changed)
+        self._on_canvas_tool_changed(self.canvas.tool)
         self._sync_mesh_controls_from_document()
 
     def _on_edge_clicked(self, edge_id: int, control_pressed: bool) -> None:
@@ -116,18 +118,29 @@ class MainWindow(QMainWindow):
         self.addToolBar(toolbar)
 
         self.action_select = QAction("Select", self)
+        self._drawing_tool_actions = QActionGroup(self)
+        self._drawing_tool_actions.setExclusive(True)
+        self.action_select.setCheckable(True)
+        self._drawing_tool_actions.addAction(self.action_select)
+        self.action_select.setChecked(True)
         self.action_select.triggered.connect(lambda: self.canvas.set_tool(None))
         toolbar.addAction(self.action_select)
 
         self.action_line = QAction("Line", self)
+        self.action_line.setCheckable(True)
+        self._drawing_tool_actions.addAction(self.action_line)
         self.action_line.triggered.connect(lambda: self.canvas.set_tool(LineTool(self.canvas)))
         toolbar.addAction(self.action_line)
 
         self.action_arc = QAction("Arc", self)
+        self.action_arc.setCheckable(True)
+        self._drawing_tool_actions.addAction(self.action_arc)
         self.action_arc.triggered.connect(lambda: self.canvas.set_tool(ArcTool(self.canvas)))
         toolbar.addAction(self.action_arc)
 
         self.action_spline = QAction("Spline", self)
+        self.action_spline.setCheckable(True)
+        self._drawing_tool_actions.addAction(self.action_spline)
         self.action_spline.triggered.connect(lambda: self.canvas.set_tool(SplineTool(self.canvas)))
         toolbar.addAction(self.action_spline)
 
@@ -203,6 +216,16 @@ class MainWindow(QMainWindow):
         toolbar.addSeparator()
         self._decorate_toolbar(toolbar)
 
+    def _on_canvas_tool_changed(self, tool) -> None:
+        active_action = self.action_select
+        if isinstance(tool, LineTool):
+            active_action = self.action_line
+        elif isinstance(tool, ArcTool):
+            active_action = self.action_arc
+        elif isinstance(tool, SplineTool):
+            active_action = self.action_spline
+        active_action.setChecked(True)
+
     # --- toolbar appearance ---
     def _cad_icon(self, kind: str) -> QIcon:
         """Create crisp CAD icons without relying on external files."""
@@ -276,7 +299,8 @@ class MainWindow(QMainWindow):
             "border-bottom: 1px solid #CBD5E1; }"
             "QToolButton { padding: 4px 7px; border-radius: 5px; }"
             "QToolButton:hover { background: #DBEAFE; }"
-            "QToolButton:pressed, QToolButton:checked { background: #BFDBFE; }"
+            "QToolButton:pressed { background: #BFDBFE; }"
+            "QToolButton:checked { background: #BFDBFE; border: 1px solid #2563EB; }"
         )
 
         entries = (

@@ -20,6 +20,7 @@ SNAP_TOLERANCE = 8.0
 class CadCanvas(QGraphicsView):
     mouse_moved = pyqtSignal(float, float)
     edge_clicked = pyqtSignal(int, bool)
+    tool_changed = pyqtSignal(object)
 
     def __init__(self, document: Document, parent=None) -> None:
         super().__init__(parent)
@@ -101,6 +102,7 @@ class CadCanvas(QGraphicsView):
         if self.tool is not None:
             self.tool.cancel()
         self.tool = tool
+        self.tool_changed.emit(tool)
 
     def add_geometry(self, geometry):
         topo = self.document.topology
@@ -441,8 +443,7 @@ class CadCanvas(QGraphicsView):
 
     def keyPressEvent(self, event) -> None:
         if event.key() == Qt.Key_Escape and self.tool is not None:
-            self.tool.cancel()
-            self.tool = None
+            self.set_tool(None)
             event.accept()
             return
         super().keyPressEvent(event)
