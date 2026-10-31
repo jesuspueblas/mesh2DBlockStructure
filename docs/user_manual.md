@@ -36,6 +36,7 @@ creating a project clears the current undo history.
 ## Canvas Navigation
 
 - Rotate the **mouse wheel** to zoom around the pointer.
+- Choose **Zoom Window**, then left-click and drag a rectangle to zoom into that area.
 - Hold the **middle mouse button** and drag to pan.
 - Click **Reset Zoom** to fit the complete model in the viewport.
 - Press **Esc** to cancel the active drawing tool.
@@ -48,6 +49,7 @@ creating a project clears the current undo history.
 Choose one of the CAD tools:
 
 - **Line:** click the start point and the end point.
+- **Zoom Window:** drag a rectangle with the left mouse button to zoom into that area.
 - **Arc:** click the center, the start point, and the end point. The arc is traversed counterclockwise.
 - **Spline:** add control points with left-click and finish with right-click.
 - **Insert Point:** enter exact X and Y coordinates for an isolated vertex.

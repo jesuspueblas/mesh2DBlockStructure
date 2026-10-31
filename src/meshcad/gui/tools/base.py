@@ -25,6 +25,9 @@ class BaseTool:
     def mouse_move(self, event) -> None:
         self._refresh_preview(event)
 
+    def mouse_release(self, event) -> None:
+        return None
+
     def cancel(self) -> None:
         self.points = []
         self.canvas.clear_preview()

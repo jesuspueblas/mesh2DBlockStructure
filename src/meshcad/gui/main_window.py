@@ -43,6 +43,7 @@ from meshcad.gui.tools.arc_tool import ArcTool
 from meshcad.gui.tools.line_tool import LineTool
 from meshcad.gui.tools.spline_tool import SplineTool
 from meshcad.gui.tools.split_edge_tool import SplitEdgeTool
+from meshcad.gui.tools.zoom_window_tool import ZoomWindowTool
 from meshcad.io.cfd_mesh_io import write_cfd_mesh_json
 from meshcad.io.point_sequence import load_point_sequence
 from meshcad.io.project_io import load_project, save_project
@@ -166,6 +167,14 @@ class MainWindow(QMainWindow):
         self.action_select.triggered.connect(lambda: self.canvas.set_tool(None))
         geometry_toolbar.addAction(self.action_select)
 
+        self.action_zoom_window = QAction("Zoom Window", self)
+        self.action_zoom_window.setCheckable(True)
+        self._drawing_tool_actions.addAction(self.action_zoom_window)
+        self.action_zoom_window.triggered.connect(
+            lambda: self.canvas.set_tool(ZoomWindowTool(self.canvas))
+        )
+        geometry_toolbar.addAction(self.action_zoom_window)
+
         self.action_line = QAction("Line", self)
         self.action_line.setCheckable(True)
         self._drawing_tool_actions.addAction(self.action_line)
@@ -288,6 +297,8 @@ class MainWindow(QMainWindow):
             active_action = self.action_spline
         elif isinstance(tool, SplitEdgeTool):
             active_action = self.action_split_edge
+        elif isinstance(tool, ZoomWindowTool):
+            active_action = self.action_zoom_window
         active_action.setChecked(True)
 
     # --- toolbar appearance ---
@@ -309,6 +320,11 @@ class MainWindow(QMainWindow):
             points = [(6, 4), (19, 16), (13, 17), (17, 24), (13, 26), (9, 19), (5, 23)]
             from PyQt5.QtCore import QPointF
             painter.drawPolygon(*[QPointF(x, y) for x, y in points])
+        elif kind == "zoom_window":
+            painter.setPen(QPen(blue, 2.0, Qt.DashLine))
+            painter.drawRect(4, 5, 18, 16)
+            painter.setPen(QPen(accent, 2.2, Qt.SolidLine, Qt.RoundCap))
+            painter.drawLine(18, 18, 25, 25)
         elif kind == "line":
             painter.drawLine(5, 22, 23, 6)
             painter.setBrush(accent)
@@ -373,6 +389,7 @@ class MainWindow(QMainWindow):
 
         entries = (
             (self.action_select, "select", "Select and edit geometry", "Select edges or drag vertices and control points."),
+            (self.action_zoom_window, "zoom_window", "Zoom to a window", "Drag a rectangle with the left mouse button to zoom into that area."),
             (self.action_line, "line", "Draw a line", "Create a segment with two clicks: start and end."),
             (self.action_arc, "arc", "Draw a circular arc", "Create an arc with three clicks: center, start, and end."),
             (self.action_spline, "spline", "Draw a spline", "Add points with left-click and finish with right-click."),

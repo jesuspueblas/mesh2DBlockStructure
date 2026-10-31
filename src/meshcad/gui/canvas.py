@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 
-from PyQt5.QtCore import Qt, QTimer, pyqtSignal
+from PyQt5.QtCore import QRectF, Qt, QTimer, pyqtSignal
 from PyQt5.QtGui import QBrush, QColor, QPainter, QPainterPath, QPen
 from PyQt5.QtWidgets import (
     QDialog,
@@ -72,7 +72,6 @@ class CadCanvas(QGraphicsView):
 
     def _model_bounding_rect(self):
         """Calculate the bounds of the complete model and visible mesh."""
-        from PyQt5.QtCore import QRectF
         bounds = None
 
         def include(x0, y0, x1, y1):
@@ -93,12 +92,25 @@ class CadCanvas(QGraphicsView):
                     include(point.x, point.y, point.x, point.y)
         return bounds
 
+    def _update_scene_rect(self, bounds: QRectF | None = None) -> None:
+        """Keep scene navigation bounds in sync with the model and viewport."""
+        rect = bounds or self._model_bounding_rect()
+        visible_rect = self.mapToScene(self.viewport().rect()).boundingRect()
+        if rect is None:
+            rect = visible_rect
+        else:
+            rect = rect.united(visible_rect)
+        margin = max(10.0, 0.05 * max(rect.width(), rect.height()))
+        rect.adjust(-margin, -margin, margin, margin)
+        self.scene().setSceneRect(rect)
+
     def reset_zoom(self) -> None:
         """Fit the entire model, reset panning, and keep Y pointing upward."""
         rect = self._model_bounding_rect()
         self.resetTransform()
         self.scale(1.0, -1.0)
         if rect is None:
+            self._update_scene_rect()
             self.centerOn(0.0, 0.0)
             self.viewport().update()
             return
@@ -109,6 +121,31 @@ class CadCanvas(QGraphicsView):
         margin = max(10.0, 0.05 * max(rect.width(), rect.height()))
         rect.adjust(-margin, -margin, margin, margin)
         self.scene().setSceneRect(rect)
+        self.fitInView(rect, Qt.KeepAspectRatio)
+        self.centerOn(rect.center())
+        self.viewport().update()
+
+    def zoom_to_rect(self, rect: QRectF) -> None:
+        """Fit a scene rectangle in the viewport."""
+        rect = rect.normalized()
+        viewport_width = max(1, self.viewport().width())
+        viewport_height = max(1, self.viewport().height())
+        width = max(rect.width(), 1e-9)
+        height = max(rect.height(), 1e-9)
+        scale = min(viewport_width / width, viewport_height / height)
+        visible_width = viewport_width / scale
+        visible_height = viewport_height / scale
+        scene_bounds = QRectF(rect)
+        scene_bounds.adjust(
+            -(visible_width - rect.width()) / 2,
+            -(visible_height - rect.height()) / 2,
+            (visible_width - rect.width()) / 2,
+            (visible_height - rect.height()) / 2,
+        )
+        bounds = self._model_bounding_rect()
+        if bounds is not None:
+            scene_bounds = scene_bounds.united(bounds)
+        self._update_scene_rect(scene_bounds)
         self.fitInView(rect, Qt.KeepAspectRatio)
         self.centerOn(rect.center())
         self.viewport().update()
@@ -551,6 +588,11 @@ class CadCanvas(QGraphicsView):
             self._drag_start_pos = None
             self._drag_start_state = None
             self._vertex_drag_moved = False
+            self._update_scene_rect()
+            event.accept()
+            return
+        if self.tool is not None:
+            self.tool.mouse_release(event)
             event.accept()
             return
         super().mouseReleaseEvent(event)
@@ -631,3 +673,5 @@ class CadCanvas(QGraphicsView):
                 self.scene().addItem(item)
                 self._grip_items.append(item)
         self._set_snap_target(self._snap_target_id)
+        if self._drag_target is None:
+            self._update_scene_rect()
