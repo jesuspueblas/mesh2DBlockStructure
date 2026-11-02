@@ -162,3 +162,21 @@ def test_clicking_near_another_vertex_does_not_merge_without_drag(qtbot):
     assert doc.topology.has_vertex(source.id)
     assert doc.topology.has_vertex(nearby.id)
     assert doc.undo_stack.count() == 0
+
+
+def test_clicking_vertex_does_not_move_it(qtbot):
+    doc = Document()
+    canvas = CadCanvas(doc)
+    canvas.resize(600, 400)
+    qtbot.addWidget(canvas)
+    vertex = doc.topology.add_vertex(Point2D(1.0, 1.0))
+    doc.notify_change()
+    canvas.show()
+    qtbot.waitExposed(canvas)
+    canvas.reset_zoom()
+
+    click_position = canvas.mapFromScene(QPointF(1.0, 1.0))
+    QTest.mouseClick(canvas.viewport(), Qt.LeftButton, pos=click_position)
+
+    assert doc.topology.get_vertex(vertex.id).point == Point2D(1.0, 1.0)
+    assert doc.undo_stack.count() == 0

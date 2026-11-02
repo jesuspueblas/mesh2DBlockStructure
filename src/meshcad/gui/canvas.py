@@ -561,25 +561,26 @@ class CadCanvas(QGraphicsView):
 
         if self._drag_target:
             if self._drag_target[0] == 'vertex':
-                scene_pos = self.mapToScene(event.pos())
-                point = Point2D(scene_pos.x(), scene_pos.y())
                 source_id = self._drag_target[1]
-                snap_target = self._vertex_drag_snap_target(source_id, point)
-                if snap_target is not None and self._vertex_drag_moved:
-                    self.document.topology.merge_vertices(source_id, snap_target.id)
-                else:
-                    self.document.topology.move_vertex(source_id, point)
-                self.document.notify_change()
+                if self._vertex_drag_moved:
+                    scene_pos = self.mapToScene(event.pos())
+                    point = Point2D(scene_pos.x(), scene_pos.y())
+                    snap_target = self._vertex_drag_snap_target(source_id, point)
+                    if snap_target is not None:
+                        self.document.topology.merge_vertices(source_id, snap_target.id)
+                    else:
+                        self.document.topology.move_vertex(source_id, point)
+                    self.document.notify_change()
+                    if self._drag_start_state is not None:
+                        command_text = (
+                            "Merge vertices"
+                            if snap_target is not None
+                            else "Move vertex"
+                        )
+                        self.document.record_undo_state(
+                            command_text, self._drag_start_state
+                        )
                 self._set_snap_target(None)
-                if self._drag_start_state is not None:
-                    command_text = (
-                        "Merge vertices"
-                        if snap_target is not None and self._vertex_drag_moved
-                        else "Move vertex"
-                    )
-                    self.document.record_undo_state(
-                        command_text, self._drag_start_state
-                    )
             elif self._drag_start_state is not None:
                 self.document.record_undo_state(
                     "Move control point", self._drag_start_state
